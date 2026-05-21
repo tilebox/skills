@@ -6,15 +6,13 @@ Skills follow the [Agent Skills](https://agentskills.io/) format. Each skill is 
 
 ## Install
 
-### Amp / Agent Skills
+### Agent Skills
 
-Clone or install this repository into an agent skills location, then start a new agent thread so skills are discovered.
+Install these agent skills, then start a new agent thread so skills are discovered.
 
 ```bash
-git clone https://github.com/tilebox/skills ~/.config/agents/skills/tilebox
+npx skills add tilebox/skills
 ```
-
-For local development, keep this repository checked out and copy or symlink the skill directories into your agent skills directory as needed.
 
 ## Skills
 
