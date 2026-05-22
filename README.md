@@ -27,6 +27,7 @@ npx skills add tilebox/skills
 | Skill | Purpose | When to Use |
 | --- | --- | --- |
 | `managing-tilebox-jobs` | Manage workflow jobs with `tilebox job`: submit, list, inspect, wait, logs, spans, retry, and cancel | Any task involving workflow job operations, debugging, or root task submission |
+| `working-with-tilebox-automations` | Work with workflow automations: list, inspect, storage locations, and one-off cron/storage trigger submissions | Any task involving Tilebox automations, automation triggers, or `CronTask` / `StorageEventTask` submissions |
 
 ## Quick Start
 
@@ -38,6 +39,9 @@ npx skills add tilebox/skills
 | "Check why this Tilebox job failed" | `managing-tilebox-jobs` |
 | "Get logs and spans for this workflow job" | `managing-tilebox-jobs` |
 | "Retry failed tasks for this job" | `managing-tilebox-jobs` |
+| "List workflow automations" | `working-with-tilebox-automations` |
+| "Submit a CronTask or StorageEventTask once" | `working-with-tilebox-automations` |
+| "Find automation storage locations" | `working-with-tilebox-automations` |
 
 ## Repository Structure
 
@@ -49,7 +53,9 @@ tilebox-skills/
     │   └── using-tilebox-cli/
     │       └── SKILL.md
     └── workflows/
-        └── managing-tilebox-jobs/
+        ├── managing-tilebox-jobs/
+        │   └── SKILL.md
+        └── working-with-tilebox-automations/
             └── SKILL.md
 ```
 
