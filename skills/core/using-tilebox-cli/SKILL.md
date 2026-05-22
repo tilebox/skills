@@ -52,6 +52,35 @@ tilebox job get <job-id> --json
 
 Human output may be a table or rich TUI. JSON output is stable for automation and easier to parse.
 
+## Combine JSON Output With `jq`
+
+Use `jq` for quick field extraction, filtering, and shell pipelines. Keep `tilebox` responsible for structured output and `jq` responsible for selecting the fields you need. Prefer keeping intermediate and final output as JSON objects or arrays; tabular/text formats such as TSV are rarely useful for agentic workflows.
+
+Examples:
+
+```bash
+# List dataset slugs
+tilebox dataset list --json | jq '[.[].slug]'
+
+# Extract a submitted job ID
+JOB_ID=$(tilebox job submit --name <job-name> --task <task-name> --input '{}' --json | jq -r '.id')
+
+# Inspect failed jobs from a query response
+tilebox job list --last 7d --state failed --json | jq '{jobs: [.jobs[] | {id, state, name}]}'
+
+# Page through commands manually by reading next_cursor
+tilebox job logs <job-id> --limit 100 --json | jq -r '.next_cursor'
+
+# Read automation storage location IDs and locations
+tilebox automation storage-locations --json | jq '{storage_locations: [.storage_locations[] | {id, type, location}]}'
+```
+
+Use `jq -e` when a script should fail if a required value is missing:
+
+```bash
+tilebox job get <job-id> --json | jq -e '.state == "completed"'
+```
+
 ## Discovering Commands And Output Schemas
 
 Use `agent-context` to inspect available commands, arguments, flags, descriptions, and output schemas.
@@ -148,11 +177,19 @@ Notes:
 
 ## Useful Command Families
 
-- `tilebox dataset list|get|generate` — dataset discovery and Go type generation.
-- `tilebox cluster list|get|create|delete` — workflow cluster management.
-- `tilebox job submit|list|get|wait|logs|spans|retry|cancel` — workflow job operations.
-- `tilebox docs search` — search Tilebox documentation from the CLI.
-- `tilebox parallel` — run a command multiple times in parallel.
+The current CLI exposes these top-level command families. Run `tilebox agent-context` after CLI changes to refresh the list.
+
+| Family | Purpose | Useful Commands |
+| --- | --- | --- |
+| `automation` | Inspect workflow automations and storage locations. | `tilebox automation list`, `tilebox automation get <automation-id>`, `tilebox automation storage-locations` |
+| `cluster` | Manage workflow compute clusters. | `tilebox cluster list`, `tilebox cluster get <cluster-slug>`, `tilebox cluster create <name>`, `tilebox cluster delete <cluster-slug>` |
+| `dataset` | Create, update, inspect, query, find datapoints, and generate types for datasets. | `tilebox dataset list`, `tilebox dataset get <dataset-slug>`, `tilebox dataset create`, `tilebox dataset update <dataset-slug>`, `tilebox dataset query <dataset-slug>`, `tilebox dataset find <dataset-slug> <datapoint-id>`, `tilebox dataset generate --slug <dataset-slug>` |
+| `dataset collection` | Manage collections within a dataset. | `tilebox dataset collection list --dataset <dataset-slug>`, `tilebox dataset collection get <name> --dataset <dataset-slug>`, `tilebox dataset collection create <name> --dataset <dataset-slug>`, `tilebox dataset collection delete <name> --dataset <dataset-slug>` |
+| `job` | Submit, monitor, debug, retry, wait for, and cancel workflow jobs. | `tilebox job submit`, `tilebox job list`, `tilebox job get <job-id>`, `tilebox job wait <job-id>`, `tilebox job retry <job-id>`, `tilebox job cancel <job-id>`, `tilebox job logs <job-id>`, `tilebox job spans <job-id>` |
+| `docs` | Search Tilebox documentation from the CLI. | `tilebox docs search "<query>"` |
+| `parallel` | Run a shell command multiple times in parallel. | `tilebox parallel -n <count> -- <command> [args...]` |
+| `upgrade` | Upgrade or reinstall the Tilebox CLI. | `tilebox upgrade`, `tilebox upgrade --version <version>`, `tilebox upgrade --force` |
+| `agent-context` | Describe command metadata and output schemas for agents. | `tilebox agent-context`, `tilebox agent-context job list --output-schema` |
 
 ## Safety And Verification
 

@@ -20,7 +20,13 @@ npx skills add tilebox/skills
 
 | Skill | Purpose | When to Use |
 | --- | --- | --- |
-| `using-tilebox-cli` | General `tilebox` CLI usage, authentication, JSON output, agent context, pagination, install, and upgrade guidance | Any task that uses the Tilebox CLI or needs command/output schema discovery |
+| `using-tilebox-cli` | General `tilebox` CLI usage, authentication, JSON output with `jq`, agent context, docs search, pagination, install, and upgrade guidance | Any task that uses the Tilebox CLI or needs command/output schema discovery |
+
+### Datasets
+
+| Skill | Purpose | When to Use |
+| --- | --- | --- |
+| `managing-tilebox-datasets` | Manage datasets with `tilebox dataset`: schema design, create/update, markdown docs, collections, datapoint query/find, and generated types | Any task involving Tilebox dataset creation, schema changes, collection management, documentation, or datapoint access |
 
 ### Workflows
 
@@ -35,6 +41,10 @@ npx skills add tilebox/skills
 | --- | --- |
 | "Use the Tilebox CLI to list datasets" | `using-tilebox-cli` |
 | "Find the output schema for `tilebox job list`" | `using-tilebox-cli` |
+| "Extract Tilebox CLI JSON fields with jq" | `using-tilebox-cli` |
+| "Create a Tilebox dataset schema" | `managing-tilebox-datasets` |
+| "Update a dataset description or schema" | `managing-tilebox-datasets` |
+| "Query datapoints from a dataset" | `managing-tilebox-datasets` |
 | "Submit a workflow job from the CLI" | `managing-tilebox-jobs` |
 | "Check why this Tilebox job failed" | `managing-tilebox-jobs` |
 | "Get logs and spans for this workflow job" | `managing-tilebox-jobs` |
@@ -51,6 +61,9 @@ tilebox-skills/
 └── skills/
     ├── core/
     │   └── using-tilebox-cli/
+    │       └── SKILL.md
+    ├── datasets/
+    │   └── managing-tilebox-datasets/
     │       └── SKILL.md
     └── workflows/
         ├── managing-tilebox-jobs/

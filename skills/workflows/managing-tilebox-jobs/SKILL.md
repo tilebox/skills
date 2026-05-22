@@ -7,6 +7,23 @@ description: "Manages Tilebox workflow jobs with the tilebox job CLI. Use when s
 
 Use this skill for operational work with `tilebox job`. For agents, use `--json` on every job command unless explicitly producing human output.
 
+## Refresh Docs And CLI Metadata
+
+Check exact installed flags and schemas before relying on memory:
+
+```bash
+tilebox agent-context job --output-schema
+tilebox docs search "workflow jobs task input identifiers observability"
+tilebox docs search "workflow observability logs traces spans"
+```
+
+Relevant docs concepts:
+
+- Tilebox Workflows is a parallel processing engine for tasks across clusters.
+- A submitted job starts a trace; each task run creates a span.
+- Task logs are correlated with job, task, runner, service, trace, and span metadata.
+- Logs emitted inside an active span also appear as span events in trace views.
+
 ## Command Choice
 
 - Start work: `tilebox job submit --name ... --task ... --input ... --json`.
