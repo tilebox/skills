@@ -1,20 +1,23 @@
 ---
 name: managing-tilebox-jobs
-description: "Manages Tilebox workflow jobs with the tilebox job CLI. Use when submitting jobs, listing jobs, inspecting state, waiting, reading logs/spans, retrying failed work, or canceling jobs."
+description: "Manages Tilebox workflow jobs with the tilebox job CLI. Use when submitting jobs, listing jobs, inspecting state, listing clusters, creating clusters, waiting for job completion, reading job logs/spans, retrying failed work, or canceling jobs."
+license: MIT
+compatibility: Requires the tilebox CLI, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.
+metadata:
+  author: tilebox
 ---
 
 # Managing Tilebox Jobs
 
-Use this skill for operational work with `tilebox job`. For agents, use `--json` on every job command unless explicitly producing human output.
+Use this skill for operational work with `tilebox job` and `tilebox cluster`. For agents, use `--json` on every job command unless explicitly producing human output.
 
-## Refresh Docs And CLI Metadata
+## Refresh CLI Metadata
 
 Check exact installed flags and schemas before relying on memory:
 
 ```bash
 tilebox agent-context job --output-schema
-tilebox docs search "workflow jobs task input identifiers observability"
-tilebox docs search "workflow observability logs traces spans"
+tilebox agent-context cluster --output-schema
 ```
 
 Relevant docs concepts:
@@ -30,8 +33,8 @@ Relevant docs concepts:
 - Find jobs: `tilebox job list --last 7d --json` or filter with `--state`, `--task-state`, `--name`.
 - Inspect one job: `tilebox job get <job-id> --json`.
 - Wait for completion/failure/cancel: `tilebox job wait <job-id> --json`.
-- Debug messages: `tilebox job logs <job-id> --sort desc --limit 100 --json`.
-- Debug timing/traces: `tilebox job spans <job-id> --sort asc --json`.
+- Inspect job log messages: `tilebox job logs <job-id> --sort desc --limit 100 --json`.
+- Inspect job traces/spans when debugging timing: `tilebox job spans <job-id> --sort asc --json`.
 - Retry eligible failed tasks after fixing the cause: `tilebox job retry <job-id> --json`.
 - Stop pending/running work: `tilebox job cancel <job-id> --json`.
 

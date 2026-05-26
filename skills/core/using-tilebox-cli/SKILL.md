@@ -1,6 +1,9 @@
 ---
 name: using-tilebox-cli
-description: "Uses the Tilebox CLI for datasets, workflows, docs search, and automation. Use when a task involves tilebox commands, authentication, JSON output, agent-context schemas, pagination, installation, or upgrades."
+description: "Use the Tilebox CLI for datasets, workflows, docs search, automations, parallel task runners. Use when a task involves tilebox commands. How to handle authentication, JSON output, agent-context schemas, pagination, installation, or upgrades."
+license: MIT
+metadata:
+  author: tilebox
 ---
 
 # Using Tilebox CLI
@@ -54,7 +57,7 @@ Human output may be a table or rich TUI. JSON output is stable for automation an
 
 ## Combine JSON Output With `jq`
 
-Use `jq` for quick field extraction, filtering, and shell pipelines. Keep `tilebox` responsible for structured output and `jq` responsible for selecting the fields you need. Prefer keeping intermediate and final output as JSON objects or arrays; tabular/text formats such as TSV are rarely useful for agentic workflows.
+Use `jq` for quick field extraction, filtering, and shell pipelines. Keep `tilebox` responsible for structured output and `jq` responsible for selecting the fields you need. Prefer keeping intermediate and final output as JSON objects or arrays.
 
 Examples:
 
@@ -105,15 +108,37 @@ Typical workflow:
 3. Run the command with `--json`.
 4. Parse fields according to the schema.
 
+## Searching Tilebox Docs
+
+Use `tilebox docs search` to browse and retrieve relevant excerpts from `docs.tilebox.com` without leaving the CLI. It is useful when you need current product documentation, conceptual guidance, examples, or SDK/API details before choosing command flags or implementation details.
+
+```bash
+tilebox docs search "dataset schema custom fields"
+tilebox docs search "query datasets temporal extent spatial extent"
+tilebox docs search "workflow job retry logs spans"
+```
+
+Search with natural-language phrases that include the product area and the exact concept, command, SDK type, or error you care about. Prefer a focused query over a broad one:
+
+```bash
+# Good: scoped to a feature and expected terminology
+tilebox docs search "dataset query spatial extent GeoJSON Polygon"
+
+# Too broad: likely to return mixed concepts
+tilebox docs search "query"
+```
+
+Use docs search when:
+
+- `agent-context` tells you the CLI shape, but you need conceptual docs or examples.
+- You need SDK or API behavior that may not be obvious from CLI help.
+- You want to confirm current docs terminology before writing user-facing documentation.
+
+Do not use docs search for command output schemas; use `tilebox agent-context <command path> --output-schema` for that.
+
 ## Pagination
 
-Some commands return paginated results with a `next_cursor` field, including:
-
-- `tilebox job list --json`
-- `tilebox job logs <job-id> --json`
-- `tilebox job spans <job-id> --json`
-
-Loop until `next_cursor` is empty:
+Some commands return paginated results with a `next_cursor` field. Pass this as `--cursor` to fetch the next page of results. Loop until `next_cursor` is empty. For example:
 
 ```bash
 tilebox job list --last 7d --limit 100 --json

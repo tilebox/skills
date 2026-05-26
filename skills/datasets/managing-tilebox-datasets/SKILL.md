@@ -1,22 +1,22 @@
 ---
 name: managing-tilebox-datasets
-description: "Manages Tilebox datasets with the tilebox dataset CLI and SDK docs. Use when creating datasets, designing or updating schemas, documenting datasets, managing collections, querying datapoints, or generating dataset types."
+description: "Manage Tilebox datasets with the tilebox CLI. Use when creating datasets, designing or updating schemas, documenting datasets, managing collections, querying and filtering datapoints, or generating dataset types."
+license: MIT
+compatibility: Requires the tilebox CLI, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.
+metadata:
+  author: tilebox
 ---
 
 # Managing Tilebox Datasets
 
-Use this skill for operational and design work with Tilebox datasets: schema design, dataset creation/update, markdown documentation, collection management, datapoint queries, datapoint lookup, and generated types. Prefer the CLI for inspection and operations; consult docs and SDKs for ingestion or spatial query workflows that are not exposed by the CLI.
+Use this skill for operational and design work with Tilebox datasets: schema design, dataset creation/update, markdown documentation, collection management, datapoint queries with filtering, datapoint lookup, and generated types. Prefer the CLI for inspection and operations; consult docs and SDKs for ingestion.
 
-## Refresh Docs And CLI Metadata
+## Refresh CLI Metadata
 
 Check exact installed flags and schemas before relying on memory:
 
 ```bash
 tilebox agent-context dataset --output-schema
-tilebox agent-context dataset collection --output-schema
-tilebox docs search "Tilebox datasets create schema custom fields documentation"
-tilebox docs search "Tilebox dataset schema update empty dataset fields"
-tilebox docs search "Tilebox datasets query collections temporal extent datapoints"
 ```
 
 Relevant docs concepts:
@@ -27,21 +27,13 @@ Relevant docs concepts:
 - Existing fields cannot be removed or changed after data has been ingested. New fields can be added because fields are optional.
 - Empty datasets are the exception: if all collections are empty, the schema can be freely edited.
 
-## Inspect Existing Datasets First
+## Inspect Existing Datasets
 
-Start by listing and inspecting existing datasets:
+Listing and inspecting existing datasets:
 
 ```bash
 tilebox dataset list --json
 tilebox dataset get <dataset-slug> --json
-```
-
-Useful `jq` extracts:
-
-```bash
-tilebox dataset list --json | jq -r '.[] | [.slug, .type, .name] | @tsv'
-tilebox dataset get <dataset-slug> --json | jq '.fields'
-tilebox dataset get <dataset-slug> --json | jq '.collections'
 ```
 
 Use `dataset get` before schema changes to understand current fields, field descriptions, collection counts, time ranges, and whether any collection contains data.
@@ -50,8 +42,8 @@ Use `dataset get` before schema changes to understand current fields, field desc
 
 Choose the dataset kind:
 
-- `temporal`: datapoints have time, id, and ingestion_time.
-- `spatiotemporal`: temporal fields plus geometry; use when datapoints have geospatial footprint/location.
+- `temporal` (`telemetry`): required fields are `time`, `id`, and `ingestion_time`.
+- `spatiotemporal` (`catalog`): required fields are `time`, `id`, `ingestion_time` and `geometry`.
 
 Custom schema rules:
 
@@ -59,8 +51,7 @@ Custom schema rules:
 - Supported field types are `string`, `bytes`, `bool`, `int64`, `uint64`, `float64`, `Duration`, `Timestamp`, `UUID`, and `Geometry`.
 - Set `"repeated": true` for array fields.
 - Include `description` and `example_value` for every field whenever possible; this improves generated dataset documentation.
-- Keep schema files in version control. For updates, provide the full custom schema, not just changed fields.
-- Prefer appending new fields to existing schema files. Treat reordering, renaming, removing, or changing field types as breaking unless the dataset is empty.
+- Treat reordering, renaming, removing, or changing field types as breaking unless the dataset is empty.
 
 Example `schema.json`:
 
@@ -200,7 +191,7 @@ Use idempotent flags in automation:
 - `--if-not-exists` for create.
 - `--if-missing-ok` for delete.
 
-Before deleting a collection, confirm intent unless the user explicitly requested deletion. Deleting a collection removes that logical collection from the dataset.
+Before deleting a collection, confirm intent unless the user explicitly requested deletion. Deleting a collection removes that logical collection from the dataset. A collection must be empty before it can be deleted.
 
 ## Query Datapoints With The CLI
 
@@ -215,6 +206,19 @@ tilebox dataset query <dataset-slug> \
   --collections raw,processed \
   --after 2026-05-01 \
   --before 2026-06-01 \
+  --limit 100
+
+# Query datapoints intersecting a WKT polygon
+tilebox dataset query <dataset-slug> \
+  --last 7d \
+  --spatial-extent 'POLYGON((-109.05 41,-109.05 37,-102.05 37,-102.05 41,-109.05 41))' \
+  --limit 100
+
+# Query datapoints intersecting a GeoJSON polygon or multipolygon file
+tilebox dataset query <dataset-slug> \
+  --after 2026-05-01 \
+  --before 2026-06-01 \
+  --spatial-extent-file colorado.geojson \
   --limit 100
 
 # Continue pagination
@@ -235,7 +239,40 @@ Temporal filters:
 - Use `--after` and `--before` for explicit RFC3339 timestamps or `YYYY-MM-DD` dates.
 - Do not combine `--last` with `--after` or `--before`.
 
-If spatial filtering or notebook-friendly xarray results are needed, use the Python SDK query APIs and consult docs. The Python SDK supports collection-level or dataset-level queries, temporal extents, spatiotemporal geometry filters, automatic pagination, progress bars, and `skip_data=True` for fast existence/count probes.
+Spatial filters:
+
+- Use `--spatial-extent` for inline WKT or GeoJSON.
+- Use `--spatial-extent-file` for a WKT or GeoJSON file.
+- The query geometry must be a `Polygon` or `MultiPolygon`; GeoJSON `Feature` wrappers are accepted when their geometry is a polygon or multipolygon.
+- Do not combine `--spatial-extent` with `--spatial-extent-file`.
+- Coordinates are longitude/latitude for geographic datasets; keep polygon rings closed.
+- Spatial filters can be combined with `--collections`, `--last`, `--after`, `--before`, `--limit`, and `--cursor`.
+
+Example inline GeoJSON query:
+
+```bash
+tilebox dataset query <dataset-slug> \
+  --collections S2A_S2MSI2A \
+  --last 14d \
+  --spatial-extent '{"type":"Polygon","coordinates":[[[-109.05,41],[-109.05,37],[-102.05,37],[-102.05,41],[-109.05,41]]]}' \
+  --limit 50
+```
+
+Example WKT file query:
+
+```bash
+cat > area.wkt <<'EOF'
+MULTIPOLYGON(((-109.05 41,-109.05 37,-102.05 37,-102.05 41,-109.05 41)))
+EOF
+
+tilebox dataset query <dataset-slug> \
+  --after 2026-05-01T00:00:00Z \
+  --before 2026-06-01T00:00:00Z \
+  --spatial-extent-file area.wkt \
+  --limit 100
+```
+
+For notebook-friendly xarray results or ingestion workflows, use the Python SDK query APIs and consult docs. The Python SDK supports collection-level or dataset-level queries, temporal extents, spatiotemporal geometry filters, automatic pagination, progress bars, and `skip_data=True` for fast existence/count probes.
 
 ## Find A Datapoint By ID
 

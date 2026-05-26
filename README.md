@@ -8,10 +8,19 @@ Skills follow the [Agent Skills](https://agentskills.io/) format. Each skill is 
 
 ### Agent Skills
 
-Install these agent skills, then start a new agent thread so skills are discovered.
+Install these agent skills with the standalone skills installer, then start a new agent thread so skills are discovered.
 
 ```bash
 npx skills add tilebox/skills
+```
+
+### Claude Code Plugin Marketplace
+
+Add this repository as a Claude Code plugin marketplace, then install the Tilebox plugin.
+
+```text
+/plugin marketplace add tilebox/skills
+/plugin install tilebox@tilebox-skills
 ```
 
 ## Skills
@@ -33,6 +42,7 @@ npx skills add tilebox/skills
 | Skill | Purpose | When to Use |
 | --- | --- | --- |
 | `managing-tilebox-jobs` | Manage workflow jobs with `tilebox job`: submit, list, inspect, wait, logs, spans, retry, and cancel | Any task involving workflow job operations, debugging, or root task submission |
+| `writing-tilebox-workflows` | Write Python Tilebox workflow code: task classes, task graphs, dataset queries, storage clients, caches, progress labels, logging, tracing, retries, dependencies, runners, and job submission | Any task creating or modifying Tilebox workflow source code |
 | `working-with-tilebox-automations` | Work with workflow automations: list, inspect, storage locations, and one-off cron/storage trigger submissions | Any task involving Tilebox automations, automation triggers, or `CronTask` / `StorageEventTask` submissions |
 
 ## Quick Start
@@ -49,6 +59,9 @@ npx skills add tilebox/skills
 | "Check why this Tilebox job failed" | `managing-tilebox-jobs` |
 | "Get logs and spans for this workflow job" | `managing-tilebox-jobs` |
 | "Retry failed tasks for this job" | `managing-tilebox-jobs` |
+| "Write a Python Tilebox workflow" | `writing-tilebox-workflows` |
+| "Add progress labels and structured logs to workflow tasks" | `writing-tilebox-workflows` |
+| "Design a Tilebox task graph with subtasks and dependencies" | `writing-tilebox-workflows` |
 | "List workflow automations" | `working-with-tilebox-automations` |
 | "Submit a CronTask or StorageEventTask once" | `working-with-tilebox-automations` |
 | "Find automation storage locations" | `working-with-tilebox-automations` |
@@ -57,6 +70,9 @@ npx skills add tilebox/skills
 
 ```text
 tilebox-skills/
+├── .claude-plugin/
+│   └── marketplace.json
+├── AGENTS.md
 ├── README.md
 └── skills/
     ├── core/
@@ -67,6 +83,8 @@ tilebox-skills/
     │       └── SKILL.md
     └── workflows/
         ├── managing-tilebox-jobs/
+        │   └── SKILL.md
+        ├── writing-tilebox-workflows/
         │   └── SKILL.md
         └── working-with-tilebox-automations/
             └── SKILL.md

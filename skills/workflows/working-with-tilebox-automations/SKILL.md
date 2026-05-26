@@ -1,6 +1,10 @@
 ---
 name: working-with-tilebox-automations
 description: "Works with Tilebox workflow automations using the tilebox CLI. Use when listing or inspecting automations, checking storage locations, or submitting one-off cron/storage automation task triggers."
+license: MIT
+compatibility: Requires the tilebox CLI, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.
+metadata:
+  author: tilebox
 ---
 
 # Working With Tilebox Automations
@@ -14,9 +18,6 @@ Check exact installed flags and schemas before relying on memory:
 ```bash
 tilebox agent-context automation --output-schema
 tilebox agent-context job submit --output-schema
-tilebox docs search "workflow automations cron triggers storage event triggers"
-tilebox docs search "CronTask once trigger time automation"
-tilebox docs search "StorageEventTask storage locations glob patterns"
 ```
 
 Relevant docs concepts:
@@ -68,27 +69,6 @@ Important fields:
 - `cron_triggers[].schedule`
 - `storage_event_triggers[].storage_location` and `glob_pattern`
 
-## Storage Locations
-
-For storage automations, discover valid storage location UUIDs with:
-
-```bash
-tilebox automation storage-locations --json
-```
-
-Use the returned `storage_locations[].id` in one-off storage trigger submissions. Keep the trigger path local to that storage location and start it with `/`:
-
-```bash
-tilebox job submit \
-  --name storage-once \
-  --task ProcessStorage \
-  --automation storage \
-  --trigger 019e4f3c-4646-7312-b8fe-2e7fa83c1546:/incoming/object.tif \
-  --json
-```
-
-The CLI looks up the storage location by UUID and constructs a `created` storage event trigger payload for the runner.
-
 ## Submit One-Off Cron Automation Tasks
 
 Use this for Python `CronTask` classes when you want to run the task once as if the cron fired.
@@ -132,6 +112,14 @@ Rules:
 - The path must start with `/`.
 - Event type is always `created`.
 - The CLI fetches the storage location from the Tilebox API before submitting.
+
+## Storage Locations
+
+To discover valid storage location UUIDs:
+
+```bash
+tilebox automation storage-locations --json
+```
 
 ## Automation Task Input
 

@@ -1,0 +1,24 @@
+{
+  "name": "tilebox-skills",
+  "owner": {
+    "name": "Tilebox"
+  },
+  "metadata": {
+    "description": "Official Tilebox skills for AI coding agents"
+  },
+  "plugins": [
+    {
+      "name": "tilebox",
+      "description": "Tilebox CLI, dataset, workflow writing, workflow job, and automation skills",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/core/using-tilebox-cli",
+        "./skills/datasets/managing-tilebox-datasets",
+        "./skills/workflows/managing-tilebox-jobs",
+        "./skills/workflows/writing-tilebox-workflows",
+        "./skills/workflows/working-with-tilebox-automations"
+      ]
+    }
+  ]
+}
