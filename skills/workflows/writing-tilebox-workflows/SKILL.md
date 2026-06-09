@@ -170,6 +170,39 @@ Good labels include the runtime dimension that distinguishes tasks:
 
 Set the label after computing useful values, but before expensive work starts.
 
+## Track Progress For Meaningful Fanout
+
+Use Tilebox progress indicators when a task submits a list of subtasks large enough that users benefit from knowing how many units are done. Progress indicators use a `done` / `total` model: `context.progress("name").add(n)` increases the total work, and `context.progress("name").done(n)` increases completed work. The job's progress is the sum of task-level progress reports, and Tilebox avoids double-counting retried tasks by only considering the last execution of a task.
+
+For fanout workflows, use this rule of thumb:
+
+- Call `progress("name").add(n)` in the task that submits `n` subtasks.
+- Call `progress("name").done(1)` in each subtask after its represented unit of work completed successfully, usually at the end of `execute()`.
+- Make the added total and completed count match: if the parent adds `n`, exactly `n` successful subtasks should collectively call `done(1)` for that indicator.
+- Use named indicators for distinct stages such as `download`, `process`, `upload`, or `finalize`.
+- Do not call `progress("name").add(n)` and `progress("name").done(n)` in the same task for subtask completion progress; that advances total and done together, so the indicator never shows useful in-progress state.
+
+Example fanout progress pattern:
+
+```python
+class ProcessScenes(Task):
+    scene_ids: list[str]
+
+    def execute(self, context: ExecutionContext) -> None:
+        context.progress("process-scenes").add(len(self.scene_ids))
+        context.submit_subtasks([
+            ProcessScene(scene_id) for scene_id in self.scene_ids
+        ])
+
+
+class ProcessScene(Task):
+    scene_id: str
+
+    def execute(self, context: ExecutionContext) -> None:
+        # process this scene successfully first
+        context.progress("process-scenes").done(1)
+```
+
 ## Use Structured Logs And Custom Spans
 
 Tilebox automatically correlates task logs with job, task, runner, trace, and span metadata. Log through `context.logger` inside tasks.
@@ -369,9 +402,10 @@ Before considering workflow-code changes complete:
 5. If the workflow uses large runtime artifacts such as model weights, ensure they are fetched lazily into a runner-local cache and excluded from the release artifact.
 6. If the task may be retried after a fix, confirm execution is re-entrant/idempotent and the task input schema remains compatible with existing failed jobs.
 7. Add `current_task.display` labels for high-fanout tasks.
-8. Add structured logs for start, selected counts, skipped/empty cases, and output locations.
-9. Add custom spans around expensive I/O, compute, and publish phases when debugging or performance matters.
-10. Run the narrowest local check available: unit tests for pure helpers, import/type checks for task modules, or a small submitted job against a known runner.
+8. Add progress indicators for sizable fanout where the total and completed subtask counts are useful to users.
+9. Add structured logs for start, selected counts, skipped/empty cases, and output locations.
+10. Add custom spans around expensive I/O, compute, and publish phases when debugging or performance matters.
+11. Run the narrowest local check available: unit tests for pure helpers, import/type checks for task modules, or a small submitted job against a known runner.
 
 ## Reference Patterns From Examples
 
