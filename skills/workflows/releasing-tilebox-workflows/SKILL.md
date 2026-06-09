@@ -23,6 +23,8 @@ For routine iteration, do the smallest safe loop:
 
 Prefer a specific release ID for production-like targets; use `--latest` for dev iteration only when that is acceptable.
 
+For failed existing jobs caused by a compatible task bug, prefer deploying the fixed release and retrying the failed job over submitting a fresh job from scratch.
+
 ## Create Or Bind A Workflow Project
 
 Create the server-side workflow, then write or update `tilebox.workflow.toml` in the project root. The CLI searches upward from the current directory for the nearest config file, so commands work from subdirectories.
@@ -104,6 +106,80 @@ The build command:
 
 If build fails, fix the config or runtime before publishing. Common fixes: include `pyproject.toml`, `uv.lock`, and `src/**`; exclude `.venv/**`; ensure the `runner` import path resolves from the extracted artifact. Fix any python import errors.
 
+## Keep Large Runtime Artifacts Out Of Releases
+
+Workflow release artifacts should contain code and small configuration, not heavyweight runtime assets. Do not include model checkpoints, embedding weights, reference rasters, large lookup tables, generated caches, or downloaded provider data in `[build].include`.
+
+Add explicit excludes when a project may contain large local assets:
+
+```toml
+[build]
+exclude = [
+  ".venv/**",
+  ".cache/**",
+  "models/**",
+  "checkpoints/**",
+  "data/**",
+  "**/*.ckpt",
+  "**/*.pt",
+  "**/*.pth",
+  "**/*.onnx",
+]
+```
+
+For reusable runtime assets such as ML checkpoints, implement runner-local lazy loading instead:
+
+- Fetch the artifact on first use, not during import, build, or publish.
+- For private assets such as private model weights, store them in a private bucket that deployed runners can access, then lazy-load from that bucket. If no such runner-accessible private bucket exists, ask the user to set one up before implementing the workflow.
+- Cache it at a deterministic path such as `~/.cache/tilebox/models/<name>/<version>/...` so it can survive workflow release changes on the same runner.
+- Validate the cached file before use, preferably with a checksum; at minimum check an expected size. Delete and redownload corrupt or incomplete files.
+- Wrap expensive in-memory initialization with `functools.lru_cache` or an equivalent process-local cache so each worker process loads the model once.
+- Keep the release artifact limited to code that locates, fetches, validates, and loads the asset.
+
+Example shape:
+
+```python
+from functools import lru_cache
+from pathlib import Path
+
+
+@lru_cache(maxsize=1)
+def load_model() -> Model:
+    checkpoint = ensure_cached_file(
+        url=MODEL_URL,
+        path=Path.home() / ".cache/tilebox/models/clay/v1.5/model.ckpt",
+        min_size_bytes=900_000_000,
+    )
+    return Model.load_from_checkpoint(checkpoint)
+```
+
+Treat runner-local caches as an optimization. The workflow must work on a cold runner with an empty cache.
+
+## Pin uv Sources For Runner-Compatible Wheels
+
+Dynamic runners may resolve and run dependencies on Linux CPU nodes, even if local development happened on a machine with different hardware or package indexes. Make platform-specific wheel sources explicit in `pyproject.toml`, include `uv.lock` in the release artifact, and avoid relying on CUDA/GPU wheels unless the target runner fleet is guaranteed to support them.
+
+For dependencies such as PyTorch, pin CPU-compatible Linux sources when appropriate:
+
+```toml
+dependencies = [
+    "claymodel==1.5.0",
+    "torch==2.4.0",
+    "torchvision==0.19.0",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+torchvision = { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+```
+
+If `uv sync` or release validation fails on a runner, check whether the lockfile or source indexes were generated for local-only hardware rather than the deployed runner platform.
+
 ## Publish A Release
 
 Publishing validates the project, uploads the artifact if needed, and creates an immutable workflow release. It is idempotent for identical release content and artifact digest: the CLI returns the existing release instead of creating a duplicate.
@@ -123,6 +199,31 @@ Before relying on output fields in automation, refresh the schema with:
 
 ```bash
 tilebox agent-context workflow publish-release --output-schema
+```
+
+## Fix Failed Jobs By Releasing And Retrying
+
+If a large workflow fails because of a task implementation bug, do not immediately resubmit the whole job. Tilebox job retry queues failed tasks again and resumes from the point of failure, so completed tasks do not need to run again.
+
+Use this pattern:
+
+1. Fix the task implementation.
+2. Keep the task identifier unchanged and use a compatible version. For backward-compatible fixes, bump the minor version; a runner with `v1.5` can execute a task submitted as `v1.3`.
+3. Publish and deploy the new workflow release to the same cluster as the failed job.
+4. Retry the failed job.
+
+```bash
+RELEASE_ID=$(tilebox workflow publish-release --json | jq -r '.id')
+tilebox workflow deploy-release --release "$RELEASE_ID" --cluster "$CLUSTER" --json
+tilebox job retry "$JOB_ID" --json
+```
+
+This works when the task input parameters are the same or backward-compatible, and the workflow shape/dependency graph expected by the failed job has not changed drastically. Do not rely on retrying an old job for breaking input or behavior changes; use a major task version bump and submit a new job instead.
+
+If command flags or output shape matter for automation, refresh the job CLI schema first:
+
+```bash
+tilebox agent-context job retry --output-schema
 ```
 
 ## Deploy Or Undeploy Releases

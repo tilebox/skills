@@ -128,6 +128,22 @@ Patterns:
 
 Avoid fine-grained DAGs that create many unique dependency shapes, such as long chains or `B[i]` depending only on `A[i]` for thousands of `i`. If the fanout is large, use orchestrator/stage tasks that submit homogeneous batches and stage barriers.
 
+## Design Tasks To Be Retryable
+
+Tasks can be retried after failures, including after a bug fix has been released to the same cluster. Write task execution to be re-entrant when practical so a failed large workflow can resume from failed tasks instead of requiring a fresh job from the beginning.
+
+Retryable task rules:
+
+- Keep side effects safe if the same task input is executed more than once.
+- Write outputs to deterministic keys or paths derived from task inputs.
+- Prefer overwrite-safe writes, existing-output checks, or atomic commit/rename patterns over append-only side effects.
+- Do not emit duplicate external records, notifications, or database rows unless the sink has an idempotency key or deduplication strategy.
+- Keep task input schemas stable. Retrying an old failed job uses the originally submitted task inputs.
+- For backward-compatible bug fixes, keep the task identifier unchanged and bump only the minor version so newer runners can execute older submitted tasks.
+- Bump the major version for breaking input or behavior changes; do not expect a major-version change to repair already-submitted tasks.
+
+This retry-and-resume pattern assumes the task input parameters remain compatible and the workflow shape/dependency graph expected by the failed job has not changed drastically.
+
 ## Add Progress Labels
 
 Set `context.current_task.display` to a concise human-readable label. This label appears in job visualization and makes large graphs easier to debug.
@@ -297,6 +313,10 @@ Cache rules:
 - Prefix keys by product, stage, or task when multiple branches write similar values.
 - Store large manifests or large intermediates in object storage and pass a small key/prefix to tasks.
 - Treat local filesystem caches as development/local-runner state unless the runner environment guarantees shared access.
+- Do not commit large model weights or static runtime artifacts into workflow source, pass them through task inputs, or store them in `job_cache`.
+- For reusable runner-local assets such as ML checkpoints, fetch lazily into a deterministic cache path under `~/.cache/tilebox/...`, validate before use, and redownload if incomplete or corrupt.
+- For private runtime assets, lazy-load from a private bucket that deployed runners can access; if none exists, ask the user to set one up first.
+- Cache expensive in-memory objects such as loaded models with `functools.lru_cache` when safe, but keep the workflow correct on a cold runner with an empty cache.
 
 Runner cache examples:
 
@@ -346,10 +366,12 @@ Before considering workflow-code changes complete:
 2. Ensure task identifiers and versions match between submitter and runner.
 3. Check task inputs are serializable and compact.
 4. Check large or cross-task data uses `job_cache` or object storage instead of task arguments.
-5. Add `current_task.display` labels for high-fanout tasks.
-6. Add structured logs for start, selected counts, skipped/empty cases, and output locations.
-7. Add custom spans around expensive I/O, compute, and publish phases when debugging or performance matters.
-8. Run the narrowest local check available: unit tests for pure helpers, import/type checks for task modules, or a small submitted job against a known runner.
+5. If the workflow uses large runtime artifacts such as model weights, ensure they are fetched lazily into a runner-local cache and excluded from the release artifact.
+6. If the task may be retried after a fix, confirm execution is re-entrant/idempotent and the task input schema remains compatible with existing failed jobs.
+7. Add `current_task.display` labels for high-fanout tasks.
+8. Add structured logs for start, selected counts, skipped/empty cases, and output locations.
+9. Add custom spans around expensive I/O, compute, and publish phases when debugging or performance matters.
+10. Run the narrowest local check available: unit tests for pure helpers, import/type checks for task modules, or a small submitted job against a known runner.
 
 ## Reference Patterns From Examples
 
