@@ -1,33 +1,66 @@
 ---
 name: releasing-tilebox-workflows
-description: "Creates, builds, publishes, deploys, undeploys, and locally tests Tilebox Agentic Workflow releases with tilebox.workflow.toml and dynamic runners. Use when iterating on workflow code, release artifacts, deployment targets, or cluster runners."
+description: "Initializes, configures, builds, publishes, deploys, undeploys, and locally tests Tilebox workflow projects and releases with tilebox.workflow.toml and dynamic runners. Use when scaffolding workflow projects, iterating on workflow code, release artifacts, deployment targets, or cluster runners."
 license: MIT
 compatibility: Requires the tilebox CLI, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.
 metadata:
   author: tilebox
 ---
 
-# Releasing Tilebox Workflows
+# Releasing And Deploying Tilebox Workflows
 
-Use this skill to turn workflow code changes into an immutable release and deploy that release to one or more Tilebox clusters. Use `writing-tilebox-workflows` for task code and this skill for project config, publish, deploy, and runner iteration.
+Use this skill to initialize workflow projects, turn workflow code changes into immutable releases, and deploy those releases to one or more Tilebox clusters. Use `writing-tilebox-workflows` for task code and this skill for project scaffold, config, publish, deploy, and runner iteration.
 
 ## Agent Release Loop
 
 For routine iteration, do the smallest safe loop:
 
-1. Edit workflow code and ensure changed files are covered by `[build].include` and not excluded.
-2. Optional local verification: `tilebox workflow build-release --debug --json`.
-3. Publish: `tilebox workflow publish-release --json`.
-4. Deploy the new release to a target or cluster.
-5. If testing locally, use a testing cluster, deploy the release to that, and run a dynamic runner for that cluster and submit a job.
+1. For a new project, initialize once with `tilebox workflow init --json` or `tilebox workflow init --name "Scene QA" --json`.
+2. Edit workflow code and ensure changed files are covered by `[build].include` and not excluded.
+3. Optional local verification: `tilebox workflow build-release --debug --json`.
+4. Publish: `tilebox workflow publish-release --json`.
+5. Deploy the new release to a target or cluster.
+6. If testing locally, use a testing cluster, deploy the release to that, and run a dynamic runner for that cluster and submit a job.
 
 Prefer a specific release ID for production-like targets; use `--latest` for dev iteration only when that is acceptable.
 
 For failed existing jobs caused by a compatible task bug, prefer deploying the fixed release and retrying the failed job over submitting a fresh job from scratch.
 
-## Create Or Bind A Workflow Project
+## Initialize A Workflow Project
 
-Create the server-side workflow, then write or update `tilebox.workflow.toml` in the project root. The CLI searches upward from the current directory for the nearest config file, so commands work from subdirectories.
+For new Python workflow projects, prefer `tilebox workflow init`. It creates the server-side workflow, scaffolds the local project files, and runs `uv sync` so the project is ready for `build-release`, `publish-release`, `deploy-release`, job submission, and local release-runner testing.
+
+```bash
+tilebox workflow init --json
+```
+
+Provide a project name when the directory name is not the name you want agents and users to see:
+
+```bash
+tilebox workflow init --name "Scene QA" --json
+```
+
+Init semantics from the CLI implementation:
+
+- Initializes the current directory only.
+- Aborts if any of `tilebox.workflow.toml`, `pyproject.toml`, `runner.py`, or `uv.lock` already exists.
+- Requires `uv` on `PATH`.
+- Derives the local project slug from `--name` when provided; otherwise from the current directory name.
+- Slugifies the project name and truncates it to at most 40 characters, preferring whole-word boundaries.
+- Creates the remote Tilebox workflow and writes the API-returned workflow slug to `tilebox.workflow.toml`.
+- Scaffolds `tilebox.workflow.toml`, `pyproject.toml`, and `runner.py`.
+- Adds `tilebox` as a `pyproject.toml` dependency.
+- Runs `uv sync`, which creates `uv.lock` and the local environment.
+
+Before relying on output fields in automation, refresh the schema with:
+
+```bash
+tilebox agent-context workflow init --output-schema
+```
+
+## Bind An Existing Or Manual Workflow Project
+
+If the project already has source layout requirements, or you need to bind an existing workflow slug, create the server-side workflow manually, then write or update `tilebox.workflow.toml` in the project root. The CLI searches upward from the current directory for the nearest config file, so commands work from subdirectories.
 
 ```bash
 WORKFLOW_SLUG=$(tilebox workflow create "Scene QA" \

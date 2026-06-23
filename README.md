@@ -42,7 +42,7 @@ Add this repository as a Claude Code plugin marketplace, then install the Tilebo
 | Skill | Purpose | When to Use |
 | --- | --- | --- |
 | `managing-tilebox-jobs` | Manage workflow jobs with `tilebox job`: submit, list, inspect, wait, logs, spans, retry, and cancel | Any task involving workflow job operations, debugging, or root task submission |
-| `releasing-tilebox-workflows` | Release and deploy Agentic Workflows with `tilebox.workflow.toml`, build/publish release commands, deployment targets, clusters, and dynamic runners | Any task involving workflow project config, build verification, release publishing, cluster deployment, undeployment, or local runner testing |
+| `releasing-tilebox-workflows` | Initialize, configure, release, and deploy Tilebox workflows with `tilebox workflow init`, `tilebox.workflow.toml`, build/publish commands, deployment targets, clusters, and dynamic runners | Any task involving workflow project scaffolding, config, build verification, release publishing, cluster deployment, undeployment, or local runner testing |
 | `writing-tilebox-workflows` | Write Python Tilebox workflow code: task classes, task graphs, dataset queries, storage clients, caches, progress labels, logging, tracing, retries, dependencies, runners, and job submission | Any task creating or modifying Tilebox workflow source code |
 | `working-with-tilebox-automations` | Work with workflow automations: list, inspect, storage locations, and one-off cron/storage trigger submissions | Any task involving Tilebox automations, automation triggers, or `CronTask` / `StorageEventTask` submissions |
 
@@ -60,6 +60,7 @@ Add this repository as a Claude Code plugin marketplace, then install the Tilebo
 | "Check why this Tilebox job failed" | `managing-tilebox-jobs` |
 | "Get logs and spans for this workflow job" | `managing-tilebox-jobs` |
 | "Retry failed tasks for this job" | `managing-tilebox-jobs` |
+| "Initialize a new Tilebox workflow project" | `releasing-tilebox-workflows` |
 | "Publish this workflow release and deploy it to dev" | `releasing-tilebox-workflows` |
 | "Edit tilebox.workflow.toml deployment targets" | `releasing-tilebox-workflows` |
 | "Start a dynamic runner locally for this workflow cluster" | `releasing-tilebox-workflows` |

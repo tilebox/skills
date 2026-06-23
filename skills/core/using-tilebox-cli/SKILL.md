@@ -68,6 +68,9 @@ tilebox dataset list --json | jq '[.[].slug]'
 # Extract a submitted job ID
 JOB_ID=$(tilebox job submit --name <job-name> --task <task-name> --input '{}' --json | jq -r '.id')
 
+# Initialize a workflow project and extract its server-side workflow slug
+WORKFLOW_SLUG=$(tilebox workflow init --name "Scene QA" --json | jq -r '.workflow_slug')
+
 # Inspect failed jobs from a query response
 tilebox job list --last 7d --state failed --json | jq '{jobs: [.jobs[] | {id, state, name}]}'
 
@@ -211,6 +214,7 @@ The current CLI exposes these top-level command families. Run `tilebox agent-con
 | `dataset` | Create, update, inspect, query, find datapoints, and generate types for datasets. | `tilebox dataset list`, `tilebox dataset get <dataset-slug>`, `tilebox dataset create`, `tilebox dataset update <dataset-slug>`, `tilebox dataset query <dataset-slug>`, `tilebox dataset find <dataset-slug> <datapoint-id>`, `tilebox dataset generate --slug <dataset-slug>` |
 | `dataset collection` | Manage collections within a dataset. | `tilebox dataset collection list --dataset <dataset-slug>`, `tilebox dataset collection get <name> --dataset <dataset-slug>`, `tilebox dataset collection create <name> --dataset <dataset-slug>`, `tilebox dataset collection delete <name> --dataset <dataset-slug>` |
 | `job` | Submit, monitor, debug, retry, wait for, and cancel workflow jobs. | `tilebox job submit`, `tilebox job list`, `tilebox job get <job-id>`, `tilebox job wait <job-id>`, `tilebox job retry <job-id>`, `tilebox job cancel <job-id>`, `tilebox job logs <job-id>`, `tilebox job spans <job-id>` |
+| `workflow` | Initialize, create, inspect, build, publish, deploy, and undeploy workflow releases. | `tilebox workflow init`, `tilebox workflow create`, `tilebox workflow list`, `tilebox workflow get`, `tilebox workflow build-release`, `tilebox workflow publish-release`, `tilebox workflow deploy-release`, `tilebox workflow undeploy-release` |
 | `docs` | Search Tilebox documentation from the CLI. | `tilebox docs search "<query>"` |
 | `parallel` | Run a shell command multiple times in parallel. | `tilebox parallel -n <count> -- <command> [args...]` |
 | `upgrade` | Upgrade or reinstall the Tilebox CLI. | `tilebox upgrade`, `tilebox upgrade --version <version>`, `tilebox upgrade --force` |

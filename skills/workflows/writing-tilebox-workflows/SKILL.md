@@ -26,9 +26,16 @@ tilebox docs search "caches job_cache"
 Use these companion skills when the task crosses into operations:
 
 - `using-tilebox-cli` for CLI discovery, authentication, JSON output, and docs search.
+- `releasing-tilebox-workflows` for `tilebox workflow init`, project config, release publishing, deployment, and runners.
 - `managing-tilebox-jobs` for submitting, listing, waiting on, debugging, retrying, or canceling jobs.
 - `managing-tilebox-datasets` for dataset schema inspection and CLI datapoint queries.
 - `working-with-tilebox-automations` for cron or storage-triggered workflow automations.
+
+## Starting A New Workflow Project
+
+When creating a new workflow project from scratch, prefer `tilebox workflow init` from the `releasing-tilebox-workflows` skill before writing substantial task code. It creates the server-side workflow, scaffolds `tilebox.workflow.toml`, `pyproject.toml`, and `runner.py`, adds the `tilebox` Python dependency, and runs `uv sync`.
+
+After initialization, either edit the generated `runner.py` directly for small prototypes or evolve it into an importable package structure as the workflow grows. Keep the configured runner object importable without starting a long-running process at import time.
 
 ## Start With A Small Architecture Plan
 
@@ -405,7 +412,8 @@ Before considering workflow-code changes complete:
 8. Add progress indicators for sizable fanout where the total and completed subtask counts are useful to users.
 9. Add structured logs for start, selected counts, skipped/empty cases, and output locations.
 10. Add custom spans around expensive I/O, compute, and publish phases when debugging or performance matters.
-11. Run the narrowest local check available: unit tests for pure helpers, import/type checks for task modules, or a small submitted job against a known runner.
+11. For scaffolded release projects, run `tilebox workflow build-release --debug --json` after editing generated task code.
+12. Run the narrowest local check available: unit tests for pure helpers, import/type checks for task modules, or a small submitted job against a known runner.
 
 ## Reference Patterns From Examples
 
