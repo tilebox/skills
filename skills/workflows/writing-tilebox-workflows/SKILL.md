@@ -398,6 +398,38 @@ print(job.id)
 
 For CLI submission, use the `managing-tilebox-jobs` skill so the payload matches Python task serialization rules.
 
+## Geospatial Earth-Data References
+
+For geospatial workflows, keep Tilebox as the outer parallel execution model. Fan out across granules, AOIs, products, windows, chunks, and model tiles with `context.submit_subtask(s)`.
+
+Prefer:
+- `obstore` for object-store access.
+- Zarr as the workflow rendezvous/intermediate format for distributed task outputs.
+- COGs as the default final raster output when no output format is specified.
+- `async-geotiff` for COG/GeoTIFF reads when applicable.
+- Rasterio/GDAL/odc/rioxarray for reprojection, warping, writing, or non-COG formats.
+- `niquests` for new non-storage HTTP calls.
+- `pyproject.toml` + `uv sync` compatible dependency declarations for all workflow dependencies.
+
+| Reference | Use when |
+| --- | --- |
+| `reference/geospatial-raster-fundamentals.md` | You need raster metadata basics: CRS, transform, bounds, resolution, band order, dtype, nodata, masks, and scale/offset. Read this before converting raster-aware objects to NumPy arrays or writing derived rasters. |
+| `reference/tiling-windowing-and-tilebox-parallelism.md` | You need to choose the workflow fanout axis: granules, products, AOIs, time windows, spatial chunks, model tiles, or recursive reductions. It distinguishes Tilebox task chunks from raster windows, internal tiles, web tiles, and storage chunks. |
+| `reference/object-storage-with-obstore.md` | You need object-store access for S3, GCS, Azure, R2, MinIO, local files, streaming reads/writes, listings, Zarr stores, or COG inputs. Prefer this over provider-specific SDKs unless the project already requires them. |
+| `reference/cloud-native-raster-io.md` | You need to read GeoTIFF/COG data efficiently from object storage or HTTP range-readable sources. It covers `async-geotiff`, `obstore`, window reads, overviews, and when Rasterio/GDAL is still the better tool. |
+| `reference/zarr-workflow-rendezvous.md` | You need shared intermediate arrays between Tilebox tasks. It covers direct `zarr` library writes, array initialization, region writes, chunk alignment, deterministic keys, and reading with xarray when convenient. |
+| `reference/cloud-optimized-geotiff-outputs.md` | You need final raster outputs. It covers COG defaults, tiling, overviews, compression, nodata/masks, validation, and the difference between a plain GeoTIFF and a valid COG. |
+| `reference/crs-reprojection-and-regridding.md` | You need to choose a target CRS/grid, reproject rasters, align products, or resample/regrid data. Prefer `odc.geo` reprojection for Tilebox geospatial workflows unless another library better fits the data model. |
+| `reference/masking-nodata-and-qa.md` | You need to handle nodata, masks, alpha bands, NaNs, QA layers, cloud masks, or morphology. It highlights mask polarity and dtype-safe choices. |
+| `reference/sentinel-2-patterns.md` | You are working with Sentinel-2 products, especially Copernicus archive JP2 assets, SCL, band resolutions, cloud cover, processing baselines, reflectance scaling, or COG alternatives. |
+| `reference/landsat-8-9-patterns.md` | You are working with Landsat 8/9 OLI/TIRS Collection 2 products, especially USGS L2 COG assets, Tilebox `L2_SR`/`L2_ST` collections, QA_PIXEL masks, scale factors, WRS path/row, or surface reflectance/temperature outputs. |
+| `reference/xarray-and-rioxarray.md` | You need labeled multidimensional arrays, rioxarray/odc metadata handling, bounded lazy reads, or xarray reads from Zarr. It keeps Tilebox tasks as the workflow-level execution model. |
+| `reference/numpy-scipy-raster-patterns.md` | You need efficient local raster math inside one task: band math, masks, histograms, morphology, local statistics, mergeable reductions, or shape/dtype discipline. |
+| `reference/geospatial-ml-inference-patterns.md` | You need tiled geospatial model inference, patch-grid outputs, band normalization, lat/lon/time/GSD model inputs, GPU/CPU handling, lazy model loading, or embedding writes. |
+| `reference/encoding-compression-and-cloud-formats.md` | You need a format decision matrix or encoding/compression guidance for COG, Zarr, NetCDF, Parquet/GeoParquet, dtype, scale/offset, fill values, chunks, and codecs. |
+| `reference/http-requests-with-niquests.md` | You need non-storage HTTP calls, sessions, streaming downloads/uploads, timeouts, rate limits, or async/sync HTTP APIs. Do not use it where `obstore` is the right storage abstraction. |
+| `reference/workflow-dependencies-and-uv.md` | You need to add or review workflow dependencies. It covers `pyproject.toml`, `uv sync`, dev dependency groups, architecture-safe packages, PyTorch index markers, and runtime asset handling. |
+
 ## Verification Checklist
 
 Before considering workflow-code changes complete:
