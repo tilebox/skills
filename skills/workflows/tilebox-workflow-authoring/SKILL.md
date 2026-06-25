@@ -1,5 +1,5 @@
 ---
-name: writing-tilebox-workflows
+name: tilebox-workflow-authoring
 description: "Guides writing Python Tilebox workflow code: task classes, task graphs, dataset queries, storage clients, caches, progress labels, logging, tracing, retries, dependencies, runners, and job submission. Use when creating or modifying Tilebox workflow source code."
 license: MIT
 compatibility: Requires the Tilebox Python SDK packages used by the workflow, commonly tilebox-workflows, tilebox-datasets, and tilebox-storage.
@@ -25,15 +25,15 @@ tilebox docs search "caches job_cache"
 
 Use these companion skills when the task crosses into operations:
 
-- `using-tilebox-cli` for CLI discovery, authentication, JSON output, and docs search.
-- `releasing-tilebox-workflows` for `tilebox workflow init`, project config, release publishing, deployment, and runners.
-- `managing-tilebox-jobs` for submitting, listing, waiting on, debugging, retrying, or canceling jobs.
-- `managing-tilebox-datasets` for dataset schema inspection and CLI datapoint queries.
-- `working-with-tilebox-automations` for cron or storage-triggered workflow automations.
+- `tilebox-cli` for CLI discovery, authentication, JSON output, and docs search.
+- `tilebox-workflow-releases` for `tilebox workflow init`, project config, release publishing, deployment, and runners.
+- `tilebox-workflow-jobs` for submitting, listing, waiting on, debugging, retrying, or canceling jobs.
+- `tilebox-datasets` for dataset schema inspection and CLI datapoint queries.
+- `tilebox-workflow-automations` for cron or storage-triggered workflow automations.
 
 ## Starting A New Workflow Project
 
-When creating a new workflow project from scratch, prefer `tilebox workflow init` from the `releasing-tilebox-workflows` skill before writing substantial task code. It creates the server-side workflow, scaffolds `tilebox.workflow.toml`, `pyproject.toml`, and `runner.py`, adds the `tilebox` Python dependency, and runs `uv sync`.
+When creating a new workflow project from scratch, prefer `tilebox workflow init` from the `tilebox-workflow-releases` skill before writing substantial task code. It creates the server-side workflow, scaffolds `tilebox.workflow.toml`, `pyproject.toml`, and `runner.py`, adds the `tilebox` Python dependency, and runs `uv sync`.
 
 After initialization, either edit the generated `runner.py` directly for small prototypes or evolve it into an importable package structure as the workflow grows. Keep the configured runner object importable without starting a long-running process at import time.
 
@@ -396,7 +396,7 @@ job = Client().jobs().submit(
 print(job.id)
 ```
 
-For CLI submission, use the `managing-tilebox-jobs` skill so the payload matches Python task serialization rules.
+For CLI submission, use the `tilebox-workflow-jobs` skill so the payload matches Python task serialization rules.
 
 ## Geospatial Earth-Data References
 

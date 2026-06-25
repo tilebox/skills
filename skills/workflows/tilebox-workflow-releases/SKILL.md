@@ -1,5 +1,5 @@
 ---
-name: releasing-tilebox-workflows
+name: tilebox-workflow-releases
 description: "Initializes, configures, builds, publishes, deploys, undeploys, and locally tests Tilebox workflow projects and releases with tilebox.workflow.toml and dynamic runners. Use when scaffolding workflow projects, iterating on workflow code, release artifacts, deployment targets, or cluster runners."
 license: MIT
 compatibility: Requires the tilebox CLI, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.
@@ -9,7 +9,7 @@ metadata:
 
 # Releasing And Deploying Tilebox Workflows
 
-Use this skill to initialize workflow projects, turn workflow code changes into immutable releases, and deploy those releases to one or more Tilebox clusters. Use `writing-tilebox-workflows` for task code and this skill for project scaffold, config, publish, deploy, and runner iteration.
+Use this skill to initialize workflow projects, turn workflow code changes into immutable releases, and deploy those releases to one or more Tilebox clusters. Use `tilebox-workflow-authoring` for task code and this skill for project scaffold, config, publish, deploy, and runner iteration.
 
 ## Agent Release Loop
 

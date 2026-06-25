@@ -1,5 +1,5 @@
 ---
-name: managing-tilebox-jobs
+name: tilebox-workflow-jobs
 description: "Manages Tilebox workflow jobs with the tilebox job CLI. Use when submitting jobs, listing jobs, inspecting state, listing clusters, creating clusters, waiting for job completion, reading job logs/spans, retrying failed work, or canceling jobs."
 license: MIT
 compatibility: Requires the tilebox CLI, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.
@@ -77,7 +77,7 @@ tilebox job submit --name from-file --task ProcessScenes --input-file scenes.jso
 cat scenes.json | tilebox job submit --name from-stdin --task ProcessScenes --input-file - --json
 ```
 
-For Python `CronTask` or `StorageEventTask` submissions, use the `working-with-tilebox-automations` skill. Those require `--automation` to construct the automation trigger wrapper.
+For Python `CronTask` or `StorageEventTask` submissions, use the `tilebox-workflow-automations` skill. Those require `--automation` to construct the automation trigger wrapper.
 
 ## Python Task Identifiers And Input
 

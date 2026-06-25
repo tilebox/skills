@@ -1,5 +1,5 @@
 ---
-name: using-tilebox-cli
+name: tilebox-cli
 description: "Use the Tilebox CLI for datasets, workflows, docs search, automations, parallel task runners. Use when a task involves tilebox commands. How to handle authentication, JSON output, agent-context schemas, pagination, installation, or upgrades."
 license: MIT
 metadata:

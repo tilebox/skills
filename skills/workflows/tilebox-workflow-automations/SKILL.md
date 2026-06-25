@@ -1,5 +1,5 @@
 ---
-name: working-with-tilebox-automations
+name: tilebox-workflow-automations
 description: "Works with Tilebox workflow automations using the tilebox CLI. Use when listing or inspecting automations, checking storage locations, or submitting one-off cron/storage automation task triggers."
 license: MIT
 compatibility: Requires the tilebox CLI, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.

@@ -1,5 +1,5 @@
 ---
-name: managing-tilebox-datasets
+name: tilebox-datasets
 description: "Manage Tilebox datasets with the tilebox CLI. Use when creating datasets, designing or updating schemas, documenting datasets, managing collections, querying and filtering datapoints, or generating dataset types."
 license: MIT
 compatibility: Requires the tilebox CLI, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.

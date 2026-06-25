@@ -8,17 +8,34 @@
   },
   "plugins": [
     {
-      "name": "tilebox",
-      "description": "Tilebox CLI, dataset, workflow writing, workflow release, workflow job, and automation skills",
+      "name": "core",
+      "description": "Core Tilebox skills for using the Tilebox CLI",
       "source": "./",
       "strict": false,
       "skills": [
-        "./skills/core/using-tilebox-cli",
-        "./skills/datasets/managing-tilebox-datasets",
-        "./skills/workflows/managing-tilebox-jobs",
-        "./skills/workflows/releasing-tilebox-workflows",
-        "./skills/workflows/writing-tilebox-workflows",
-        "./skills/workflows/working-with-tilebox-automations"
+        "./skills/core/tilebox",
+        "./skills/core/tilebox-cli"
+      ]
+    },
+    {
+      "name": "datasets",
+      "description": "Tilebox dataset skills for managing datasets, collections, datapoints, and schemas",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/datasets/tilebox-datasets"
+      ]
+    },
+    {
+      "name": "workflows",
+      "description": "Tilebox workflow skills for writing, releasing, running, and automating workflows",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/workflows/tilebox-workflow-authoring",
+        "./skills/workflows/tilebox-workflow-releases",
+        "./skills/workflows/tilebox-workflow-jobs",
+        "./skills/workflows/tilebox-workflow-automations"
       ]
     }
   ]
