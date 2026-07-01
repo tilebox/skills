@@ -25,7 +25,7 @@ Common fanout choices:
 - One task per model tile for fixed-size ML inference.
 - Recursive task trees for global reductions that can be represented as compact mergeable summaries.
 
-Keep task inputs compact: chunk bounds, object keys, IDs, CRS/resolution, and small config values. Store large arrays and shared intermediates in Zarr/object storage.
+Keep each task's serialized dataclass input at most 2048 bytes across all fields and values together. Good task inputs are compact: chunk bounds, object keys, IDs, CRS/resolution, small config values, cache keys, and object prefixes. Store large AOIs/GeoJSON, manifests, arrays, and shared intermediates in `context.job_cache`, Zarr, or object storage, then pass only the cache key, object key, or prefix to subtasks.
 
 ## Chunk Size Rules Of Thumb
 

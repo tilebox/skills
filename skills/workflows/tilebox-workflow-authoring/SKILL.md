@@ -33,7 +33,9 @@ Use these companion skills when the task crosses into operations:
 
 ## Starting A New Workflow Project
 
-When creating a new workflow project from scratch, prefer `tilebox workflow init` from the `tilebox-workflow-releases` skill before writing substantial task code. It creates the server-side workflow, scaffolds `tilebox.workflow.toml`, `pyproject.toml`, and `runner.py`, adds the `tilebox` Python dependency, and runs `uv sync`.
+When creating a new workflow project from scratch, first use `tilebox workflow init` from the `tilebox-workflow-releases` skill before writing substantial task code. Do not manually create the initial `pyproject.toml`, `tilebox.workflow.toml`, or `runner.py` for a new project.
+
+`tilebox workflow init` creates the server-side workflow, scaffolds `tilebox.workflow.toml`, `pyproject.toml`, and `runner.py`, adds the `tilebox` Python dependency, and runs `uv sync`. `uv` is required for workflow initialization, workflow release build/publish validation, and `tilebox runner start`; if it is missing, install or fix `uv` before continuing rather than hand-scaffolding the project.
 
 After initialization, either edit the generated `runner.py` directly for small prototypes or evolve it into an importable package structure as the workflow grows. Keep the configured runner object importable without starting a long-running process at import time.
 
@@ -101,8 +103,10 @@ Task identifier rules:
 
 Input design:
 
+- The serialized input for each task must be at most 2048 bytes. This limit applies to all dataclass fields and their values together after serialization, including root tasks and every submitted subtask.
 - Keep inputs compact: IDs, time windows, AOI bounds, chunk coordinates, small config values, cache keys, and object prefixes.
-- Do not pass large arrays, manifests, dataframes, xarray datasets, binary data, or thousands of URLs as task parameters.
+- Do not pass large arrays, large polygons/GeoJSON, manifests, dataframes, xarray datasets, binary data, or thousands of URLs as task parameters.
+- If a task needs more than 2048 bytes of input data, write the data to `context.job_cache` or object storage and pass only a small cache key, object key, or prefix to the task.
 - Pass source identifiers or object-store locations, not local file paths between tasks.
 - Use typed fields and defaults instead of unpacking unstructured dictionaries unless the payload is naturally dynamic.
 
@@ -347,9 +351,37 @@ class SelectProducts(Task):
         context.job_cache["products"] = "\n".join(products).encode()
 ```
 
+When a subtask would need an input payload larger than 2048 bytes, cache the payload and pass a compact key instead:
+
+```python
+import hashlib
+import json
+
+
+class ProcessArea(Task):
+    aoi_key: str
+
+    def execute(self, context: ExecutionContext) -> None:
+        aoi = json.loads(context.job_cache[self.aoi_key])
+        # process the AOI
+
+
+class SplitAreas(Task):
+    def execute(self, context: ExecutionContext) -> None:
+        tasks = []
+        for aoi in build_large_geojson_aois():
+            payload = json.dumps(aoi, separators=(",", ":")).encode()
+            key = f"aoi/{hashlib.sha256(payload).hexdigest()}"
+            context.job_cache[key] = payload
+            tasks.append(ProcessArea(aoi_key=key))
+
+        context.submit_subtasks(tasks)
+```
+
 Cache rules:
 
 - Use `job_cache` for compact intermediate data shared within one job.
+- Use `job_cache` or object storage for any payload that would make a task's serialized dataclass input exceed 2048 bytes; pass only the cache key or object key as the task field.
 - Prefix keys by product, stage, or task when multiple branches write similar values.
 - Store large manifests or large intermediates in object storage and pass a small key/prefix to tasks.
 - Treat local filesystem caches as development/local-runner state unless the runner environment guarantees shared access.
@@ -409,7 +441,7 @@ Prefer:
 - `async-geotiff` for COG/GeoTIFF reads when applicable.
 - Rasterio/GDAL/odc/rioxarray for reprojection, warping, writing, or non-COG formats.
 - `niquests` for new non-storage HTTP calls.
-- `pyproject.toml` + `uv sync` compatible dependency declarations for all workflow dependencies.
+- `pyproject.toml` + `uv sync` compatible dependency declarations for all workflow dependencies, with no editable installs or local path dependencies.
 
 | Reference | Use when |
 | --- | --- |
@@ -428,7 +460,7 @@ Prefer:
 | `reference/geospatial-ml-inference-patterns.md` | You need tiled geospatial model inference, patch-grid outputs, band normalization, lat/lon/time/GSD model inputs, GPU/CPU handling, lazy model loading, or embedding writes. |
 | `reference/encoding-compression-and-cloud-formats.md` | You need a format decision matrix or encoding/compression guidance for COG, Zarr, NetCDF, Parquet/GeoParquet, dtype, scale/offset, fill values, chunks, and codecs. |
 | `reference/http-requests-with-niquests.md` | You need non-storage HTTP calls, sessions, streaming downloads/uploads, timeouts, rate limits, or async/sync HTTP APIs. Do not use it where `obstore` is the right storage abstraction. |
-| `reference/workflow-dependencies-and-uv.md` | You need to add or review workflow dependencies. It covers `pyproject.toml`, `uv sync`, dev dependency groups, architecture-safe packages, PyTorch index markers, and runtime asset handling. |
+| `reference/workflow-dependencies-and-uv.md` | You need to add or review workflow dependencies. It covers `pyproject.toml`, `uv sync`, dev dependency groups, no editable/local path dependencies, architecture-safe packages, PyTorch index markers, and runtime asset handling. |
 
 ## Verification Checklist
 
@@ -436,8 +468,8 @@ Before considering workflow-code changes complete:
 
 1. Ensure every task class used by submitted jobs is registered with the runner.
 2. Ensure task identifiers and versions match between submitter and runner.
-3. Check task inputs are serializable and compact.
-4. Check large or cross-task data uses `job_cache` or object storage instead of task arguments.
+3. Check each task's serialized dataclass input is at most 2048 bytes, including all fields and values together.
+4. Check large or cross-task data uses `job_cache` or object storage instead of task arguments, with only keys/prefixes passed to subtasks.
 5. If the workflow uses large runtime artifacts such as model weights, ensure they are fetched lazily into a runner-local cache and excluded from the release artifact.
 6. If the task may be retried after a fix, confirm execution is re-entrant/idempotent and the task input schema remains compatible with existing failed jobs.
 7. Add `current_task.display` labels for high-fanout tasks.

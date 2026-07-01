@@ -74,7 +74,7 @@ Use multiple skills when the task spans design, code, release, and operations:
 | User task | Use these skills |
 | --- | --- |
 | Create a dataset and use it from workflow code | `tilebox-datasets` + `tilebox-workflow-authoring` |
-| Scaffold a new workflow project and write task code | `tilebox-workflow-releases` + `tilebox-workflow-authoring` |
+| Create or scaffold a new workflow project from scratch | `tilebox-workflow-releases` first to run `tilebox workflow init`, then `tilebox-workflow-authoring` for task code |
 | Publish a workflow change and retry a failed job | `tilebox-workflow-releases` + `tilebox-workflow-jobs` |
 | Debug a failed workflow task from logs and fix the code | `tilebox-workflow-jobs` + `tilebox-workflow-authoring` |
 | Build geospatial raster processing, reprojection, grid alignment, COG/Zarr output, or satellite-data workflow code | `tilebox-workflow-authoring` + `tilebox-datasets` when dataset queries or schemas are involved |

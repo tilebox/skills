@@ -2,7 +2,7 @@
 name: tilebox-workflow-releases
 description: "Initializes, configures, builds, publishes, deploys, undeploys, and locally tests Tilebox workflow projects and releases with tilebox.workflow.toml and dynamic runners. Use when scaffolding workflow projects, iterating on workflow code, release artifacts, deployment targets, or cluster runners."
 license: MIT
-compatibility: Requires the tilebox CLI, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.
+compatibility: Requires the tilebox CLI, uv on PATH for workflow init/releases and `tilebox runner start`, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.
 metadata:
   author: tilebox
 ---
@@ -15,7 +15,7 @@ Use this skill to initialize workflow projects, turn workflow code changes into 
 
 For routine iteration, do the smallest safe loop:
 
-1. For a new project, initialize once with `tilebox workflow init --json` or `tilebox workflow init --name "Scene QA" --json`.
+1. For a new project, initialize once with `tilebox workflow init --json` or `tilebox workflow init --name "Scene QA" --json` before creating project files by hand.
 2. Edit workflow code and ensure changed files are covered by `[build].include` and not excluded.
 3. Optional local verification: `tilebox workflow build-release --debug --json`.
 4. Publish: `tilebox workflow publish-release --json`.
@@ -28,7 +28,11 @@ For failed existing jobs caused by a compatible task bug, prefer deploying the f
 
 ## Initialize A Workflow Project
 
-For new Python workflow projects, prefer `tilebox workflow init`. It creates the server-side workflow, scaffolds the local project files, and runs `uv sync` so the project is ready for `build-release`, `publish-release`, `deploy-release`, job submission, and local release-runner testing.
+For a new Python workflow project, run `tilebox workflow init` before creating `pyproject.toml`, `tilebox.workflow.toml`, `runner.py`, source packages, or tests. Do not hand-write the initial workflow project scaffold.
+
+`tilebox workflow init` creates the server-side workflow, writes the API-returned slug into `tilebox.workflow.toml`, scaffolds the local project files, adds the `tilebox` Python dependency, and runs `uv sync` so the project is ready for `build-release`, `publish-release`, `deploy-release`, job submission, and local release-runner testing.
+
+`uv` is required on `PATH` for workflow initialization, release build/publish validation, and `tilebox runner start`. If `uv` is missing, fix the `uv` installation first, then rerun `tilebox workflow init`. Do not fall back to manual scaffolding just because `uv` is not initially available.
 
 ```bash
 tilebox workflow init --json
@@ -60,7 +64,15 @@ tilebox agent-context workflow init --output-schema
 
 ## Bind An Existing Or Manual Workflow Project
 
-If the project already has source layout requirements, or you need to bind an existing workflow slug, create the server-side workflow manually, then write or update `tilebox.workflow.toml` in the project root. The CLI searches upward from the current directory for the nearest config file, so commands work from subdirectories.
+Use this path only when one of these is true:
+
+- the directory is an existing workflow/codebase that cannot be initialized cleanly;
+- the user explicitly asks to bind an existing Tilebox workflow slug;
+- `tilebox workflow init` was attempted, the failure was diagnosed, and manual binding is the smallest safe recovery.
+
+Do not use `tilebox workflow create` as the first step for a new project. For new projects, use `tilebox workflow init`, then evolve the generated files.
+
+For an existing or manual workflow project, create the server-side workflow manually, then write or update `tilebox.workflow.toml` in the project root. The CLI searches upward from the current directory for the nearest config file, so commands work from subdirectories.
 
 ```bash
 WORKFLOW_SLUG=$(tilebox workflow create "Scene QA" \
@@ -124,6 +136,8 @@ runner = Runner(tasks=[SceneQA, SomeSubtask], cache=LocalFileSystemCache())
 ## Build Is Optional Verification
 
 `publish-release` builds and validates before uploading, so `build-release` is an optional confidence check when you want more detailed feedback before publishing.
+
+Workflow release commands that validate or run the Python worker runtime require `uv` on `PATH`, including `tilebox workflow build-release` and `tilebox workflow publish-release`. If `uv` is missing, install or fix `uv` before retrying the release command.
 
 ```bash
 tilebox workflow build-release --debug --json
@@ -216,6 +230,8 @@ If `uv sync` or release validation fails on a runner, check whether the lockfile
 ## Publish A Release
 
 Publishing validates the project, uploads the artifact if needed, and creates an immutable workflow release. It is idempotent for identical release content and artifact digest: the CLI returns the existing release instead of creating a duplicate.
+
+Publishing requires `uv` on `PATH` because it builds and validates the Python workflow runtime before upload.
 
 ```bash
 RELEASE_ID=$(tilebox workflow publish-release --debug --json | tee /tmp/workflow-release.json | jq -r '.id')
@@ -313,6 +329,8 @@ tilebox cluster get dev-cluster --json
 ## Start A Dynamic Runner Locally
 
 A dynamic runner executes tasks for releases deployed to a cluster. It polls cluster deployment state, downloads/extracts missing artifacts, validates release task registrations, starts Python worker runtimes, and keeps running. It logs to stderr and does not emit JSON output.
+
+`tilebox runner start` requires `uv` on `PATH` to start Python worker runtimes from workflow release artifacts. If `uv` is missing, install or fix `uv` before starting the runner.
 
 Terminal 1:
 

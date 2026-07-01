@@ -9,9 +9,33 @@ Do not rely on ad-hoc `pip install`, notebook state, undeclared local packages, 
 - Put runtime dependencies in `[project].dependencies`.
 - Put lint/type/test tools in dependency groups such as `[dependency-groups].dev`.
 - Keep Python version constraints realistic for all intended runners.
+- Do not add editable installs or local path dependencies. Avoid dependency declarations such as `my-lib @ file://...`, `my-lib @ ../my-lib`, `[tool.uv.sources].my-lib = { path = "..." }`, or `{ path = "...", editable = true }`.
+- If workflow code needs local modules, keep them inside the workflow source tree and include them in the workflow release artifact; if it needs a reusable library, publish/version that library in a package index or vendor the needed source into the workflow project.
 - Run `uv sync` after dependency changes.
 - Validate imports and runner startup after sync.
 - Avoid adding heavy dependencies when a smaller library fits.
+
+## No Editable Or Local Path Dependencies
+
+Workflow releases must resolve dependencies from the release artifact and package indexes on the runner. Editable installs and local path dependencies depend on files outside the released project or on development-machine paths, so they will fail to resolve during release validation or on `tilebox runner start`.
+
+Do not use these patterns in workflow `pyproject.toml`:
+
+```toml
+dependencies = [
+  "shared-lib @ file:///Users/alice/dev/shared-lib",
+  "shared-lib @ ../shared-lib",
+]
+
+[tool.uv.sources]
+shared-lib = { path = "../shared-lib", editable = true }
+```
+
+Use one of these instead:
+
+- publish the dependency to a package index and pin a normal version constraint;
+- move the source under the workflow project, for example `src/my_workflow/shared_lib/`, and include it via `[build].include`;
+- copy a small, stable helper module into the workflow package when publishing a separate library would be overkill.
 
 ## Geospatial Defaults
 
