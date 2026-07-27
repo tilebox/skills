@@ -25,23 +25,23 @@ The CLI authenticates with either:
 
 ```bash
 export TILEBOX_API_KEY=...
-tilebox dataset list --json
+tilebox account get --json
 ```
 
 or per command:
 
 ```bash
-tilebox dataset list --api-key "$TILEBOX_API_KEY" --json
+tilebox account get --api-key "$TILEBOX_API_KEY" --json
 ```
 
 The default API is `https://api.tilebox.com`. Override it for staging or local environments:
 
 ```bash
 # a staging env
-tilebox --api-url https://api.tilebox.dev dataset list --json
+tilebox --api-url https://api.tilebox.dev account get --json
 ```
 
-If auth is missing, commands return a validation-style usage error. Do not print or log API keys.
+If auth is missing, commands return a validation-style usage error. After installation, or when investigating authentication failures, use `tilebox account get --json` to verify the API endpoint and active credential. Do not print or log API keys.
 
 ## JSON Output
 
@@ -170,11 +170,10 @@ Install a specific version:
 curl -fsSL https://cli.tilebox.com/install.sh | TILEBOX_VERSION=0.3.1 sh
 ```
 
-Ensure the install directory is on `PATH`, then verify:
+Ensure the install directory is on `PATH`, set `TILEBOX_API_KEY`, then verify the installation and authentication:
 
 ```bash
-tilebox --version
-tilebox --help
+tilebox account get --json
 ```
 
 ## Updating The CLI
@@ -209,6 +208,7 @@ The current CLI exposes these top-level command families. Run `tilebox agent-con
 
 | Family | Purpose | Useful Commands |
 | --- | --- | --- |
+| `account` | Inspect the active account, usage overages, and subscription tier. | `tilebox account get`, `tilebox account subscription`, `tilebox account usage`, `tilebox whoami` |
 | `automation` | Inspect workflow automations and storage locations. | `tilebox automation list`, `tilebox automation get <automation-id>`, `tilebox automation storage-locations` |
 | `cluster` | Manage workflow compute clusters. | `tilebox cluster list`, `tilebox cluster get <cluster-slug>`, `tilebox cluster create <name>`, `tilebox cluster delete <cluster-slug>` |
 | `dataset` | Create, update, inspect, query, find datapoints, and generate types for datasets. | `tilebox dataset list`, `tilebox dataset get <dataset-slug>`, `tilebox dataset create`, `tilebox dataset update <dataset-slug>`, `tilebox dataset query <dataset-slug>`, `tilebox dataset find <dataset-slug> <datapoint-id>`, `tilebox dataset generate --slug <dataset-slug>` |
