@@ -49,6 +49,7 @@ Custom schema rules:
 
 - Field names must be `snake_case` and valid code identifiers.
 - Supported field types are `string`, `bytes`, `bool`, `int64`, `uint64`, `float64`, `Duration`, `Timestamp`, `UUID`, and `Geometry`.
+- Set `"queryable": true` on custom fields that should support server-side filtering.
 - Set `"repeated": true` for array fields.
 - Include `description` and `example_value` for every field whenever possible; this improves generated dataset documentation.
 - Treat reordering, renaming, removing, or changing field types as breaking unless the dataset is empty.
@@ -68,6 +69,7 @@ Example `schema.json`:
     {
       "name": "cloud_cover",
       "type": "float64",
+      "queryable": true,
       "description": "Cloud cover percentage for the scene.",
       "example_value": "12.5"
     },
@@ -195,42 +197,86 @@ Before deleting a collection, confirm intent unless the user explicitly requeste
 
 ## Query Datapoints With The CLI
 
-`tilebox dataset query` always emits JSON. Use it for quick inspection and scripts.
+`tilebox dataset query` always emits JSON. Agents should still pass `--json` consistently. Use it for quick inspection and scripts.
 
 ```bash
 # Query all collections in the last 7 days
-tilebox dataset query <dataset-slug> --last 7d --limit 100
+tilebox dataset query <dataset-slug> --last 7d --limit 100 --json
 
 # Query specific collections over a time range
 tilebox dataset query <dataset-slug> \
   --collections raw,processed \
   --after 2026-05-01 \
   --before 2026-06-01 \
-  --limit 100
+  --limit 100 \
+  --json
 
 # Query datapoints intersecting a WKT polygon
 tilebox dataset query <dataset-slug> \
   --last 7d \
   --spatial-extent 'POLYGON((-109.05 41,-109.05 37,-102.05 37,-102.05 41,-109.05 41))' \
-  --limit 100
+  --limit 100 \
+  --json
 
 # Query datapoints intersecting a GeoJSON polygon or multipolygon file
 tilebox dataset query <dataset-slug> \
   --after 2026-05-01 \
   --before 2026-06-01 \
   --spatial-extent-file colorado.geojson \
-  --limit 100
+  --limit 100 \
+  --json
 
 # Continue pagination
-tilebox dataset query <dataset-slug> --last 7d --limit 100 --cursor <next_cursor>
+tilebox dataset query <dataset-slug> --last 7d --limit 100 --cursor <next_cursor> --json
 ```
+
+### Filter Queryable Fields
+
+`--filter` accepts a CQL2 Text expression over queryable dataset fields. Before constructing one, discover the fields the dataset exposes:
+
+```bash
+tilebox dataset get <dataset-slug> --json \
+  | jq '[.fields[] | select(.queryable == true) | {name, type, description, exampleValue}]'
+```
+
+Map the user's intent to an exact queryable field and choose operators from its type. Do not invent field names or assume every schema field is queryable.
+
+- Strings support exact equality and `IS NULL` / `IS NOT NULL`; prefix, substring, pattern, and ordering comparisons are unsupported.
+- Boolean fields support equality/inequality with `TRUE` or `FALSE` and null checks.
+- Numeric fields support `=`, `<>`, `<`, `<=`, `>`, and `>=`.
+- All comparisons, `NOT`, `AND`, and `OR` use SQL/CQL2 three-valued logic: comparisons against null or missing values are unknown, `NOT unknown` remains unknown, and only true results match.
+- Include null values explicitly when the user's intent requires them, for example `cloud_cover < 5 OR cloud_cover IS NULL`.
+- Parentheses, nested `AND` / `OR` expressions, and `NOT` are supported.
+- Repeating `--filter` combines the filters with explicit `AND`.
+
+Examples:
+
+```bash
+# Exact string and numeric comparison
+tilebox dataset query tilebox.sentinel2_msi --last 5d \
+  --filter "cloud_cover < 5 AND platform = 'sentinel-2c'" \
+  --json
+
+# Nested logic that deliberately includes missing cloud cover
+tilebox dataset query tilebox.sentinel2_msi --last 5d \
+  --filter "(cloud_cover < 5 OR cloud_cover IS NULL) AND platform = 'sentinel-2c'" \
+  --json
+
+# Equivalent explicit AND across repeated flags
+tilebox dataset query tilebox.sentinel2_msi --last 5d \
+  --filter "cloud_cover < 5" \
+  --filter "platform = 'sentinel-2c'" \
+  --json
+```
+
+If the user asks for unsupported string matching such as a prefix or substring, explain the limitation and use an exact match only if it preserves their intent. When null handling is ambiguous and materially changes results, clarify whether missing values should be included.
 
 Extract fields with `jq`:
 
 ```bash
-tilebox dataset query <dataset-slug> --last 7d --limit 10 | jq '.datapoints'
-tilebox dataset query <dataset-slug> --last 7d --limit 10 | jq -r '.next_cursor'
-tilebox dataset query <dataset-slug> --last 7d --limit 10 | jq -r '.datapoints[] | [.id, .time] | @tsv'
+tilebox dataset query <dataset-slug> --last 7d --limit 10 --json | jq '.datapoints'
+tilebox dataset query <dataset-slug> --last 7d --limit 10 --json | jq -r '.next_cursor'
+tilebox dataset query <dataset-slug> --last 7d --limit 10 --json | jq -r '.datapoints[] | [.id, .time] | @tsv'
 ```
 
 Temporal filters:
@@ -255,7 +301,8 @@ tilebox dataset query <dataset-slug> \
   --collections S2A_S2MSI2A \
   --last 14d \
   --spatial-extent '{"type":"Polygon","coordinates":[[[-109.05,41],[-109.05,37],[-102.05,37],[-102.05,41],[-109.05,41]]]}' \
-  --limit 50
+  --limit 50 \
+  --json
 ```
 
 Example WKT file query:
@@ -269,10 +316,32 @@ tilebox dataset query <dataset-slug> \
   --after 2026-05-01T00:00:00Z \
   --before 2026-06-01T00:00:00Z \
   --spatial-extent-file area.wkt \
-  --limit 100
+  --limit 100 \
+  --json
 ```
 
-For notebook-friendly xarray results or ingestion workflows, use the Python SDK query APIs and consult docs. The Python SDK supports collection-level or dataset-level queries, temporal extents, spatiotemporal geometry filters, automatic pagination, progress bars, and `skip_data=True` for fast existence/count probes.
+### Filter With The Python SDK
+
+The Python SDK accepts one typed `filter=` expression on dataset-level and collection-level queries. Build it with `field()`; combine expressions with `&`, `|`, and `~`, not Python `and`, `or`, or `not`. Parenthesize comparisons when combining them.
+
+```python
+from tilebox.datasets import field
+
+data = dataset.query(
+    temporal_extent=(start, end),
+    filter=(field("cloud_cover") < 5) & (field("platform") == "sentinel-2c"),
+)
+
+data_including_missing = dataset.query(
+    temporal_extent=(start, end),
+    filter=((field("cloud_cover") < 5) | field("cloud_cover").is_null())
+    & (field("platform") == "sentinel-2c"),
+)
+```
+
+Use `field("name").is_null()` and `.is_not_null()` for null checks. A comparison against a null or missing field evaluates to unknown and is excluded, including `!=` and negated comparisons; explicitly OR with `.is_null()` to include it. The Python API builds a typed expression rather than parsing CQL2 text, and exposes a single `filter=` argument, so compose multiple conditions into one expression.
+
+Python SDK queries return notebook-friendly xarray results and also support temporal extents, spatiotemporal geometry filters, automatic pagination, progress bars, and `skip_data=True` for fast existence/count probes.
 
 ## Find A Datapoint By ID
 
