@@ -12,7 +12,7 @@ Use this skill whenever interacting with the `tilebox` command-line tool. Prefer
 
 ## Core Rules For Agents
 
-- Prefer `--json` for commands that return data or status.
+- Always pass `--json` in agent workflows when the command supports it; never pass `--interactive`.
 - Use `tilebox agent-context <command path> --output-schema` before relying on a command's output shape.
 - Pass authentication via `TILEBOX_API_KEY` unless the user explicitly asks to use `--api-key`.
 - Use `--api-url` only when targeting a non-default API environment.
@@ -45,7 +45,7 @@ If auth is missing, commands return a validation-style usage error. After instal
 
 ## JSON Output
 
-Use `--json` by default in agent workflows:
+Always use `--json` for supported commands in agent workflows:
 
 ```bash
 tilebox dataset list --json
@@ -53,7 +53,7 @@ tilebox job list --last 7d --json
 tilebox job get <job-id> --json
 ```
 
-Human output may be a table or rich TUI. JSON output is stable for automation and easier to parse.
+`--json` emits compact, unstyled, non-paginated output even under a pseudo-terminal. Human output may contain terminal styling, and `--interactive` may start a pager, so agents should not use either.
 
 ## Combine JSON Output With `jq`
 
