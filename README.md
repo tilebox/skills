@@ -25,7 +25,7 @@ Add this repository as a Claude Code plugin marketplace, then install the Tilebo
 /plugin install workflows@tilebox-skills
 ```
 
-Install `core` and `workflows` for implicit Earth observation project routing. Install `datasets` as well when workflows need Tilebox dataset discovery, schemas, collections, or datapoint queries. The standalone `npx skills add` command installs the complete skill set.
+Install `core`, `datasets`, and `workflows` for implicit Earth observation projects so agents can select a source, distinguish Tilebox metadata from provider-hosted bytes, author the workflow, and run it. The standalone `npx skills add` command installs the complete skill set.
 
 ## Skills
 
@@ -33,14 +33,14 @@ Install `core` and `workflows` for implicit Earth observation project routing. I
 
 | Skill | Purpose | When to Use |
 | --- | --- | --- |
-| `tilebox` | Router and end-to-end orchestrator for Tilebox skills | Broad Tilebox tasks and implementation-oriented Earth observation or geospatial processing, including prompts that do not name Tilebox |
+| `tilebox` | Router and end-to-end orchestrator for Tilebox skills | Broad Tilebox tasks and implementation-oriented Earth observation or geospatial processing |
 | `tilebox-cli` | General `tilebox` CLI usage, authentication, JSON output with `jq`, agent context, docs search, pagination, install, and upgrade guidance | Any task that uses the Tilebox CLI or needs command/output schema discovery |
 
 ### Datasets
 
 | Skill | Purpose | When to Use |
 | --- | --- | --- |
-| `tilebox-datasets` | Manage datasets with `tilebox dataset`: schema design, create/update, markdown docs, collections, datapoint query/find, and generated types | Any task involving Tilebox dataset creation, schema changes, collection management, documentation, or datapoint access |
+| `tilebox-datasets` | Select Earth observation and external auxiliary sources, and manage datasets with `tilebox dataset`: live catalog inspection, provider access, schemas, collections, and datapoint queries | Choosing source or supporting DEM/weather/climate data from a target product—or working with dataset schemas, collections, documentation, and datapoints |
 
 ### Workflows
 
@@ -59,6 +59,8 @@ Install `core` and `workflows` for implicit Earth observation project routing. I
 | "Find the output schema for `tilebox job list`" | `tilebox-cli` |
 | "Extract Tilebox CLI JSON fields with jq" | `tilebox-cli` |
 | "Create a Tilebox dataset schema" | `tilebox-datasets` |
+| "Choose the best dataset for a cloud-free satellite timelapse" | `tilebox-datasets` |
+| "Explain which provider credentials this dataset needs" | `tilebox-datasets` |
 | "Update a dataset description or schema" | `tilebox-datasets` |
 | "Query datapoints from a dataset" | `tilebox-datasets` |
 | "Submit a workflow job from the CLI" | `tilebox-workflow-jobs` |
@@ -92,7 +94,18 @@ The following outcome-oriented prompts should activate the `tilebox` router with
 
 The router must still check data availability, spatial resolution, temporal coverage, sensor suitability, licensing or authentication, and model availability. For example, medium-resolution imagery may not resolve an individual house, vehicle, or small vessel well enough for the requested output.
 
-## Routing Evaluation Prompts
+### Timelapse Default
+
+For a prompt such as “Generate a satellite timelapse of cloud-free images over New York over the last two years, featuring a 15×15 km area centered on Central Park,” the agent should:
+
+1. Explain that Sentinel-2 is suitable for neighborhood-scale and larger visual change, but not fine object-level detail.
+2. Select `open_data.aws_earth.sentinel2`, collection `L2A`, without asking the user to choose a dataset.
+3. Use the credentials-free public source without introducing provider setup or storage internals unless they become relevant.
+4. Use a local output folder for a suitable notebook/local single-process quickstart instead of requiring an output bucket.
+5. Warn and guide the user to shared output storage before moving the workflow to remote or distributed runners.
+6. Optionally mention Landsat 8/9 as a longer-history addition, but do not enable a joint multi-sensor pipeline by default.
+
+## Routing And Selection Evaluation Prompts
 
 Use these cases when reviewing changes to skill discovery and routing. Skill selection is model-driven, so these are behavioral expectations rather than deterministic unit tests.
 
@@ -101,7 +114,13 @@ Use these cases when reviewing changes to skill discovery and routing. Skill sel
 | “Monitor deforestation in this region over the last five years.” | Route to `tilebox`; initialize or reuse a workflow, author it, deploy to non-production, and run a representative job when inputs are sufficient. |
 | “Create a flood extent map over this AOI.” | Route to `tilebox`; plan a suitable optical or SAR pipeline, then carry it through deployment and output verification. |
 | “Detect ships from satellite imagery in this area.” | Route to `tilebox`; verify sensor resolution and model feasibility before implementing tiled inference and deployment. |
-| “Create a visual timelapse of my house.” | Route to `tilebox`, but ask for the private AOI and missing time interval rather than guessing them. |
+| “Create a visual timelapse of my house.” | Route to `tilebox`; author AOI and time as reusable job inputs, then request technical coordinates and the time interval only when submitting a job. Default to public `open_data.aws_earth.sentinel2` if suitable and explain the resolution limit. |
+| “Create a cloud-free optical timelapse for this AOI over the last two years.” | Select AWS Earth Search Sentinel-2 L2A and public COG access by default; do not require source-provider credentials. |
+| “Build a forty-year vegetation history.” | Consider the USGS Landsat archive, explain 30 m and requester-pays tradeoffs, and do not choose Sentinel-2 solely because it is easier to access. |
+| “Use Copernicus Data Space Sentinel-2 SAFE products.” | Respect the explicit source, explain metadata-versus-payload access, and guide account and S3 credential setup from direct Copernicus links. |
+| “Map flooding during this cloudy storm.” | Do not blindly select optical Sentinel-2; choose and validate a suitable SAR source and explain provider access. |
+| “Add a timelapse to this initialized Tilebox workflow.” | Detect `tilebox.workflow.toml`, skip initialization, select the source, and author the processing. |
+| “Move this locally working timelapse to remote runners.” | Warn that local output paths are not shared/durable and guide shared output-storage setup before remote execution. |
 | “Explain common approaches to flood mapping.” | Answer the conceptual question; do not create or deploy a workflow unless implementation is requested. |
 | “Show me the CRS and dimensions of this GeoTIFF.” | Inspect the file directly; do not create a workflow for a small metadata lookup. |
 | “Implement this analysis in Google Earth Engine.” | Respect the named platform; do not substitute Tilebox unless the user requests an integration or migration. |

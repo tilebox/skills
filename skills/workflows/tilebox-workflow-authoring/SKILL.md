@@ -28,7 +28,7 @@ Use these companion skills when the task crosses into operations:
 - `tilebox-cli` for CLI discovery, authentication, JSON output, and docs search.
 - `tilebox-workflow-releases` for `tilebox workflow init`, project config, release publishing, deployment, and runners.
 - `tilebox-workflow-jobs` for submitting, listing, waiting on, debugging, retrying, or canceling jobs.
-- `tilebox-datasets` for dataset schema inspection and CLI datapoint queries.
+- `tilebox-datasets` for target-product source selection, provider access guidance, dataset schema inspection, and CLI datapoint queries.
 - `tilebox-workflow-automations` for cron or storage-triggered workflow automations.
 
 ## Starting A New Workflow Project
@@ -283,11 +283,11 @@ from tilebox.datasets.data import TimeInterval
 
 
 def load_sentinel2(aoi: Polygon, start: str, end: str) -> xr.Dataset:
-    dataset = DatasetClient().dataset("open_data.copernicus.sentinel2_msi")
+    dataset = DatasetClient().dataset("open_data.aws_earth.sentinel2")
     interval = TimeInterval(start=start, end=end)
 
     return dataset.query(
-        collections=["S2A_S2MSI2A", "S2B_S2MSI2A", "S2C_S2MSI2A"],
+        collections=["L2A"],
         temporal_extent=interval,
         spatial_extent=aoi,
         show_progress=True,
@@ -304,7 +304,9 @@ Dataset rules:
 
 ## Choose Storage Access Based On Data Format
 
-Tilebox datasets index metadata; they usually do not host open-data product bytes. Prefer Tilebox storage clients when they cover the provider and the task needs whole files or provider-specific path/auth behavior.
+Tilebox datasets index metadata; they usually do not host open-data product bytes. For public COG sources such as `open_data.aws_earth.sentinel2`, prefer credentials-free cloud-native reads. Use Tilebox storage clients when the selected provider requires authentication or the task needs whole files or provider-specific path behavior.
+
+**TODO(storage API):** Revisit the concrete storage-client versus cloud-native accessor guidance in this section after the in-progress Tilebox Python storage API design is finalized.
 
 Use storage clients for:
 
@@ -314,7 +316,7 @@ Use storage clients for:
 
 Use cloud-native reads directly for COG, Zarr, or cloud-optimized NetCDF when partial spatial/temporal reads materially reduce bytes transferred.
 
-Example storage-client pattern:
+Authenticated Copernicus storage-client alternative:
 
 ```python
 from pathlib import Path
@@ -458,7 +460,7 @@ Prefer:
 | `reference/masking-nodata-and-qa.md` | You need to handle nodata, masks, alpha bands, NaNs, QA layers, cloud masks, or morphology. It highlights mask polarity and dtype-safe choices. |
 | `reference/time-series-compositing-and-visualization.md` | You need a timelapse, cloud-free or periodic composite, before/after comparison, consistently styled frame sequence, or encoded video with traceable source timestamps. |
 | `reference/sentinel-1-sar-patterns.md` | You are working with Sentinel-1 or SAR for flood mapping, maritime/ship detection, surface change, or deformation, and need product selection, preprocessing consistency, false-positive controls, and validation guidance. |
-| `reference/sentinel-2-patterns.md` | You are working with Sentinel-2 products, especially Copernicus archive JP2 assets, SCL, band resolutions, cloud cover, processing baselines, reflectance scaling, or COG alternatives. |
+| `reference/sentinel-2-patterns.md` | You are working with Sentinel-2 L2A, especially the default public AWS Earth Search COG source, SCL, band resolutions, cloud cover, processing baselines, reflectance scaling, or the authenticated Copernicus archive alternative. |
 | `reference/landsat-8-9-patterns.md` | You are working with Landsat 8/9 OLI/TIRS Collection 2 products, especially USGS L2 COG assets, Tilebox `L2_SR`/`L2_ST` collections, QA_PIXEL masks, scale factors, WRS path/row, or surface reflectance/temperature outputs. |
 | `reference/xarray-and-rioxarray.md` | You need labeled multidimensional arrays, rioxarray/odc metadata handling, bounded lazy reads, or xarray reads from Zarr. It keeps Tilebox tasks as the workflow-level execution model. |
 | `reference/numpy-scipy-raster-patterns.md` | You need efficient local raster math inside one task: band math, masks, histograms, morphology, local statistics, mergeable reductions, or shape/dtype discipline. |

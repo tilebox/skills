@@ -24,7 +24,9 @@ For change analysis, prefer acquisitions with compatible:
 - Preprocessing chain and calibration convention.
 - Seasonal and environmental conditions where practical.
 
-Opposite look directions, different orbits, terrain shadows, layover, incidence-angle differences, and inconsistent preprocessing can look like surface change. Preserve these attributes in the selection manifest and output provenance.
+Opposite look directions, different orbits, terrain shadows, layover, incidence-angle differences, and inconsistent preprocessing can look like surface change. Preserve these attributes in output provenance when useful.
+
+Reprojection to a common map grid aligns output coordinates, but it does not remove SAR viewing-geometry or radiometric differences. For quantitative pixel-level time-series or change analysis, strongly prefer the same relative orbit/track, pass direction, mode, and polarization. Different geometries can be combined only when the method explicitly models or normalizes incidence angle and look-direction effects, masks shadow/layover, and is validated for that use; simple regridding alone is insufficient.
 
 ## Preprocess Deliberately
 
@@ -36,7 +38,7 @@ Rules:
 - Keep track of whether values represent amplitude, intensity/power, sigma nought, gamma nought, or another convention.
 - Perform ratios, differences, thresholds, and averaging in the intended numeric domain; do not mix linear and decibel values accidentally.
 - Treat speckle filtering as an explicit tradeoff because it can remove small or narrow targets.
-- Use a suitable DEM and terrain masks in areas where slope, shadow, or layover matters.
+- Use a suitable DEM and terrain masks in areas where slope, shadow, or layover matters. A cloud-native option is Earth Data Hub's [Copernicus DEM Global 30m Zarr](https://earthdatahub.destine.eu/collections/copernicus-dem/datasets/GLO-30); guide users through DestinE registration and API-key setup with the `tilebox-datasets` auxiliary-data reference before authenticated access.
 - Never apply optical cloud-mask or reflectance assumptions to SAR data.
 
 ## Flood Mapping Pattern
@@ -77,9 +79,9 @@ Treat deformation as a specialized workflow. If exact processing requirements, r
 
 ## Tilebox Task Graph
 
-Useful fanout axes include acquisition, burst/swath, AOI, raster chunk, and detector tile. Keep source product IDs, orbit/polarization metadata, object keys, and chunk coordinates in compact task inputs. Store large manifests and aligned intermediates in object storage or Zarr.
+Useful fanout axes include acquisition, burst/swath, AOI, raster chunk, and detector tile. Keep source product IDs, orbit/polarization metadata, object keys, and chunk coordinates in compact task inputs. Store aligned intermediates in object storage or Zarr only when a later stage needs a cross-task rendezvous or different chunking axis.
 
-For pairwise change, use a root task to select compatible acquisitions and write the manifest, parallel preprocessing tasks per acquisition, parallel change/inference tasks per chunk, and an aggregation task for deduplication, validation summaries, and final COG/vector outputs.
+For pairwise change, use a root task to select compatible acquisitions, parallel preprocessing tasks per acquisition when needed, parallel change/inference tasks per chunk, and an aggregation task for deduplication, validation summaries, and final COG/vector outputs. Keep preprocessing and analysis together in memory when they share the same bounded task axis.
 
 ## Verification
 

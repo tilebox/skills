@@ -19,9 +19,9 @@ For routine iteration, do the smallest safe loop:
 2. Edit workflow code and ensure changed files are covered by `[build].include` and not excluded.
 3. Optional local verification: `tilebox workflow build-release --debug --json`.
 4. Publish: `tilebox workflow publish-release --json`.
-5. Deploy the new release to a target or cluster.
+5. Deploy the new release. For quick first results, omit `--cluster` to use the API default cluster instead of asking the user to choose one.
 6. If the user requested an actual processed artifact, use `tilebox-workflow-jobs` to submit and verify a representative job after deployment; deployment alone does not create the artifact.
-7. If testing locally, use a testing cluster, deploy the release to that, and run a dynamic runner for that cluster and submit a job.
+7. If no compatible runner is active and local execution is appropriate, start a dynamic runner for the same cluster; omitting `--cluster` also uses the API default cluster.
 
 Prefer a specific release ID for production-like targets; use `--latest` for dev iteration only when that is acceptable.
 
@@ -33,10 +33,10 @@ When the `tilebox` router accepts an implementation-oriented Earth observation o
 
 Apply these boundaries:
 
-- Prefer an existing configured development target. Otherwise use an explicitly identified development cluster or an API default cluster already known to be non-production.
+- For routine first results, use an existing configured development target when one is clearly intended; otherwise omit `--cluster` and use the organization's API default cluster. Do not ask a new user to choose or create a cluster merely to run a small workflow.
 - Never infer or select a production target from a generic outcome-oriented prompt. Require explicit production intent.
 - Respect constraints such as “code only,” “local prototype,” “do not publish,” or “do not deploy.”
-- If several materially different non-production targets exist and the correct one cannot be inferred, ask a narrow target question before deployment rather than guessing.
+- Explain cluster concepts and ask about target topology when the user is configuring infrastructure, rolling out dedicated clusters, or selecting among materially different execution environments.
 - If authentication, a suitable cluster, or a runner is unavailable, finish and verify the local project where possible, then report the exact operational blocker. Do not claim a publish, deployment, or completed output that did not occur.
 - Use `tilebox-workflow-jobs` after deployment when the requested outcome is a map, animation, detection set, statistics, or another generated product.
 
