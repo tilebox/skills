@@ -1,11 +1,16 @@
 # Sentinel-2 Patterns
 
-Use this reference for Sentinel-2 workflows, especially Copernicus archive products. If the user does not specify a different source, prefer the Copernicus archive/product layout used by Tilebox examples. There are COG alternatives for Sentinel-2 in public clouds; use those when the user asks for them or when COG-native access is clearly the better fit.
+Use this reference for Sentinel-2 workflows. If the user does not specify a source and Sentinel-2 fits the requested product, default to Tilebox dataset `open_data.aws_earth.sentinel2`, collection `L2A`. It indexes Element 84 AWS Earth Search public COG assets, which require no source-provider credentials and support efficient window/range reads.
+
+Use `open_data.copernicus.sentinel2_msi` only when the user explicitly requests Copernicus Data Space, needs original archive/SAFE/JP2 products, or another Copernicus-specific requirement outweighs the simpler public COG path. Tilebox indexes metadata and asset locations for both sources; it does not host the source imagery bytes.
+
+For target-product selection and provider setup, use the companion `tilebox-datasets` skill and its product matrix, open-data catalog, AWS Earth Search guide, or Copernicus Data Space guide.
 
 ## Collections And Products
 
 - L1C collections: top-of-atmosphere products.
 - L2A collections: surface reflectance products with scene classification.
+- `open_data.aws_earth.sentinel2` exposes an `L2A` collection with public COG assets. Verify the live collection and schema before coding.
 - Copernicus archive assets are commonly JP2 files inside SAFE-like product structures.
 - Common L2A bands include B02, B03, B04, B08 at 10m and B05, B06, B07, B8A, B11, B12 at 20m.
 - SCL is the Scene Classification Layer, commonly at 20m.
@@ -23,32 +28,36 @@ Typical metadata filters:
 - processing baseline
 - product ID/location
 
-For multiple collections, query each collection or use the dataset API pattern supported by the current Tilebox SDK, then concatenate/sort by time.
+Query `open_data.aws_earth.sentinel2` with collection `L2A` for the default path. Inspect sample datapoints for canonical STAC assets, storage profiles, S3/HTTPS locations, band keys, scale/offset, nodata, and QA conventions. Do not reconstruct paths from product IDs when explicit asset locations are available.
 
-## Copernicus JP2 Read Pattern
+## Default AWS Earth Search COG Pattern
 
-For Copernicus archive JP2 assets:
+For `open_data.aws_earth.sentinel2`:
 
-1. Locate the product paths for desired bands and SCL.
-2. Read the JP2 asset with Rasterio/GDAL (`JP2OpenJPEG`) or a project-specific storage client.
-3. Build a source grid from the asset transform/CRS.
-4. Reproject to a shared target grid.
-5. Write to Zarr as the workflow rendezvous.
+1. Query `L2A` metadata by AOI, time, and suitable queryable quality fields such as cloud cover.
+2. Read canonical asset locations from the returned metadata.
+3. **TODO(storage API):** Update the concrete accessor/store choice and COG read pattern after the in-progress Tilebox Python storage API design is finalized.
+4. Apply scale/offset and masks from inspected metadata deliberately.
+5. Build a source grid from raster CRS/transform and reproject to a shared target grid when needed. Keep bounded read, masking, calibration, normalization, and matching visualization/analysis in one task when possible; write an intermediate only for a later rechunk or different fanout axis.
 
-`async-geotiff` is for GeoTIFF/COG reads; it is not the JP2 reader.
+Do not ask the user to create AWS credentials for this public source. If a client attempts signed access, configure unsigned/anonymous access instead. Public input access does not provide output storage; use local output only for suitable notebook/local execution and require shared storage for remote or distributed work.
 
-## COG Alternatives
+## Authenticated Copernicus Archive Alternative
 
-Some Sentinel-2 mirrors expose COG assets. For COG sources:
+For `open_data.copernicus.sentinel2_msi` archive products:
 
-- prefer `async-geotiff` with `obstore` for reads,
-- use windowed reads where possible,
-- avoid downloading full scenes when only an AOI/chunk is needed,
-- confirm band naming, scale, nodata, and QA conventions because they may differ from Copernicus JP2 products.
+1. Explain that the Tilebox API key covers metadata, not Copernicus product downloads.
+2. Guide the user through Copernicus Data Space registration and S3 credential generation using the direct links in the `tilebox-datasets` Copernicus provider guide.
+3. Read credentials from the local/runner environment and pass them to `CopernicusStorageClient`; never hardcode, log, or serialize them in task inputs.
+4. Locate desired bands and SCL inside the selected product.
+5. Read JP2 with Rasterio/GDAL (`JP2OpenJPEG`) or use the provider-specific storage client for required whole/partial product access.
+6. Validate one authenticated product read before bulk work.
+
+`async-geotiff` is for GeoTIFF/COG reads; it is not the JP2 reader. Credentials configured locally do not automatically reach remote runners.
 
 ## Reprojection And Resampling
 
-Prefer `odc.geo` reprojection for the Copernicus JP2-to-target-grid pattern.
+Prefer `odc.geo` reprojection when it fits the data model. Rasterio/GDAL remains appropriate for JP2, warping, writing, or operations unsupported by the COG-native read path.
 
 Choose resampling by variable:
 

@@ -1,6 +1,6 @@
 ---
 name: tilebox-datasets
-description: "Manage Tilebox datasets with the tilebox CLI. Use when creating datasets, designing or updating schemas, documenting datasets, managing collections, querying and filtering datapoints, or generating dataset types."
+description: "Discovers, selects, inspects, queries, and manages Tilebox datasets and external auxiliary grids. Use when choosing Earth observation or supporting DEM, weather, climate, QA, or land-mask data from a requested target product—even if no dataset is named—or when evaluating coverage, resolution, collections, schemas, datapoints, storage access, credentials, dataset creation, or schema updates."
 license: MIT
 compatibility: Requires the tilebox CLI, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.
 metadata:
@@ -9,7 +9,7 @@ metadata:
 
 # Managing Tilebox Datasets
 
-Use this skill for operational and design work with Tilebox datasets: schema design, dataset creation/update, markdown documentation, collection management, datapoint queries with filtering, datapoint lookup, and generated types. Prefer the CLI for inspection and operations; consult docs and SDKs for ingestion.
+Use this skill to choose Tilebox datasets from target-product requirements and for operational and design work with datasets: inspection, querying, schema design, creation/update, documentation, collection management, datapoint lookup, and generated types. Prefer the CLI for live catalog inspection and operations.
 
 ## Refresh CLI Metadata
 
@@ -27,6 +27,56 @@ Relevant docs concepts:
 - Existing fields cannot be removed or changed after data has been ingested. New fields can be added because fields are optional.
 - Empty datasets are the exception: if all collections are empty, the schema can be freely edited.
 
+## Select A Dataset From The Target Product
+
+When the user describes an Earth observation result but does not name a dataset, own the selection instead of asking the user to choose from unfamiliar slugs:
+
+1. Translate the target product into modality, product level, bands or polarizations, spatial resolution, time range, revisit, latency, cloud tolerance, QA, and validation requirements.
+2. Read `reference/earth-observation-product-selection.md` to identify a default and meaningful alternatives.
+3. Read `reference/open-data-dataset-catalog.md` for exact Tilebox slugs, payload providers, formats, authentication, and limitations.
+4. Verify candidates against the live catalog with `tilebox dataset list --json` and `tilebox dataset get <slug> --json`.
+5. Query a small metadata sample over the requested AOI and time range. Confirm collections, fields, coverage, asset locations, and access metadata rather than trusting remembered schemas.
+6. Classify source access as public unsigned, provider-authenticated, requester-pays, or restricted. Read the linked provider guide before coding data access.
+7. Select one default, explain why it fits, and mention alternatives only when their tradeoffs are useful. Do not silently combine sensors or providers.
+
+For ordinary optical multispectral surface-reflectance work, default to `open_data.aws_earth.sentinel2` when the user did not specify a source and Sentinel-2 resolution, coverage, revisit, and cloud limitations are suitable. Its Element 84 AWS Earth Search L2A payloads are public COGs and require no source-provider credentials. Landsat 8/9 can be suggested as an optional addition for a longer historical record, but do not create a joint Sentinel-2/Landsat pipeline by default because harmonizing grids, resolution, spectral response, radiometry, and styling adds meaningful complexity.
+
+Do not use that optical default when the outcome needs cloud-penetrating SAR, deformation, active-fire or temperature measurements, finer object-level resolution, a longer pre-Sentinel-2 archive, or an explicitly requested provider/product layout.
+
+## Select Auxiliary Data Outside Tilebox
+
+Workflows often need supporting data that Tilebox does not index, such as a DEM, weather or climate reanalysis, permanent-water or land masks, population, or another global grid. Treat these as auxiliary inputs rather than inventing a Tilebox dataset slug. Read `reference/auxiliary-data-sources.md`, research the current catalogues, and select by variable semantics, spatial/temporal resolution, coverage, update cadence, vertical/reference conventions, chunking, license, and access requirements.
+
+Strongly prefer an analysis-ready Zarr or Icechunk source for large global or multidimensional auxiliary grids when its chunking fits the workflow. Subset lazily to the task's AOI, time, variables, and levels instead of downloading the full store. Credentials-free access is still preferable when scientifically equivalent, but do not sacrifice product correctness for convenience.
+
+Distinguish external global auxiliaries from product-coupled layers. A Sentinel-2 Scene Classification Layer, Landsat QA band, SAR incidence-angle layer, or similar per-acquisition data normally belongs to the selected source product and should be read with that product rather than looked up in a separate global catalogue.
+
+Before authoring, tell the user when an auxiliary provider account or subscription is required and guide setup using direct links in the auxiliary reference. Configure keys through the local or runner secret environment, validate one bounded read, and remember that local credentials do not automatically reach remote runners.
+
+### Dataset Selection And Provider References
+
+| Reference | Use when |
+| --- | --- |
+| `reference/earth-observation-product-selection.md` | Map a target product to observation requirements, a default dataset, alternatives, and counterexamples. |
+| `reference/open-data-dataset-catalog.md` | Look up verified Tilebox open-data slugs and compare providers, formats, authentication, costs, and limitations. |
+| `reference/auxiliary-data-sources.md` | Select DEM, weather/climate, masks, or other supporting grids outside Tilebox, favoring suitable Zarr/Icechunk sources and guiding provider access. |
+| `reference/providers/aws-earth-search.md` | Use the default public Sentinel-2 L2A COG source from Element 84 AWS Earth Search. |
+| `reference/providers/copernicus-data-space.md` | Access `open_data.copernicus.*` product bytes with a Copernicus account and S3 credentials. |
+| `reference/providers/usgs-landsat.md` | Access `open_data.usgs.*` Landsat bytes in the AWS requester-pays bucket. |
+| `reference/providers/alaska-satellite-facility.md` | Access `open_data.asf.*` SAR product bytes with NASA Earthdata Login credentials. |
+
+## Separate Metadata From Product Bytes
+
+Tilebox open-data datasets index structured metadata and asset locations; Tilebox usually does not host the source imagery bytes. A Tilebox API key does not automatically grant access to Copernicus, USGS/AWS, ASF, commercial providers, private source buckets, or an output bucket.
+
+Keep three access layers explicit:
+
+1. **Tilebox API:** metadata queries and workflow/job operations via the Tilebox API key.
+2. **Source storage:** provider-hosted imagery bytes, which may be public or require separate credentials.
+3. **Output storage:** local disk for suitable notebook/local work, or user-controlled shared storage for remote or distributed work. Do not assume Tilebox-hosted output storage exists.
+
+For every selected source, tell the user what Tilebox provides, where the bytes live, their format, whether source credentials or requester-pays charges apply, and what access was actually validated. Never ask the user to paste secrets into chat or place them in task inputs, `job_cache`, logs, source control, or release artifacts.
+
 ## Inspect Existing Datasets
 
 Listing and inspecting existing datasets:
@@ -36,7 +86,7 @@ tilebox dataset list --json
 tilebox dataset get <dataset-slug> --json
 ```
 
-Use `dataset get` before schema changes to understand current fields, field descriptions, collection counts, time ranges, and whether any collection contains data.
+Use `dataset get` before selection or schema changes to understand current fields, field descriptions, collection counts, time ranges, and whether any collection contains data.
 
 ## Schema Design
 
@@ -253,17 +303,17 @@ Examples:
 
 ```bash
 # Exact string and numeric comparison
-tilebox dataset query tilebox.sentinel2_msi --last 5d \
+tilebox dataset query open_data.aws_earth.sentinel2 --last 5d \
   --filter "cloud_cover < 5 AND platform = 'sentinel-2c'" \
   --json
 
 # Nested logic that deliberately includes missing cloud cover
-tilebox dataset query tilebox.sentinel2_msi --last 5d \
+tilebox dataset query open_data.aws_earth.sentinel2 --last 5d \
   --filter "(cloud_cover < 5 OR cloud_cover IS NULL) AND platform = 'sentinel-2c'" \
   --json
 
 # Equivalent explicit AND across repeated flags
-tilebox dataset query tilebox.sentinel2_msi --last 5d \
+tilebox dataset query open_data.aws_earth.sentinel2 --last 5d \
   --filter "cloud_cover < 5" \
   --filter "platform = 'sentinel-2c'" \
   --json
@@ -297,8 +347,8 @@ Spatial filters:
 Example inline GeoJSON query:
 
 ```bash
-tilebox dataset query <dataset-slug> \
-  --collections S2A_S2MSI2A \
+tilebox dataset query open_data.aws_earth.sentinel2 \
+  --collections L2A \
   --last 14d \
   --spatial-extent '{"type":"Polygon","coordinates":[[[-109.05,41],[-109.05,37],[-102.05,37],[-102.05,41],[-109.05,41]]]}' \
   --limit 50 \
