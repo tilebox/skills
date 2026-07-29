@@ -1,6 +1,6 @@
 ---
 name: tilebox-workflow-authoring
-description: "Guides writing Python Tilebox workflow code: task classes, task graphs, dataset queries, storage clients, caches, progress labels, logging, tracing, retries, dependencies, runners, and job submission. Use when creating or modifying Tilebox workflow source code."
+description: "Builds Python Tilebox workflows for Earth observation and geospatial processing, including satellite imagery queries, AOI and time-series pipelines, mosaics, spectral indices, classification, segmentation, change detection, and tiled ML or object detection. Use when implementing or modifying this processing, including when Tilebox is not named and no other execution platform is established."
 license: MIT
 compatibility: Requires the Tilebox Python SDK packages used by the workflow, commonly tilebox-workflows, tilebox-datasets, and tilebox-storage.
 metadata:
@@ -9,7 +9,7 @@ metadata:
 
 # Writing Tilebox Workflows
 
-Use this skill when creating or modifying Python Tilebox workflow code. Keep the scope to workflow source code and local/runtime iteration.
+Use this skill when creating or modifying Python Tilebox workflow code, including Earth observation or geospatial processing routed to Tilebox from an outcome-oriented prompt. Keep the scope to workflow source code and local/runtime iteration.
 
 ## Refresh Current APIs First
 
@@ -39,9 +39,11 @@ When creating a new workflow project from scratch, first use `tilebox workflow i
 
 After initialization, either edit the generated `runner.py` directly for small prototypes or evolve it into an importable package structure as the workflow grows. Keep the configured runner object importable without starting a long-running process at import time.
 
-## Start With A Small Architecture Plan
+## Translate The Outcome And Plan The Architecture
 
-For non-trivial workflows, sketch the task graph before coding:
+For Earth observation requests, first read `reference/earth-observation-project-planning.md` to turn the requested outcome into feasible data, sensor, resolution, temporal, validation, and delivery requirements. Use `reference/time-series-compositing-and-visualization.md` for timelapses, composites, or before/after products and `reference/sentinel-1-sar-patterns.md` for SAR, flood, deformation, or maritime analysis. Do not silently choose a sensor or algorithm that cannot meet the requested scale or accuracy.
+
+Then sketch the task graph before coding:
 
 1. Identify the root task and each worker/aggregation stage.
 2. Choose the fanout axis: time windows, scenes/granules, AOIs, chunks, or products.
@@ -445,6 +447,7 @@ Prefer:
 
 | Reference | Use when |
 | --- | --- |
+| `reference/earth-observation-project-planning.md` | You need to translate a user outcome such as environmental monitoring, crop health, disaster assessment, maritime analysis, urban change, imagery production, or geospatial ML into feasible inputs, sensors, validation, task stages, and outputs. Read this first for implicit Earth observation projects. |
 | `reference/geospatial-raster-fundamentals.md` | You need raster metadata basics: CRS, transform, bounds, resolution, band order, dtype, nodata, masks, and scale/offset. Read this before converting raster-aware objects to NumPy arrays or writing derived rasters. |
 | `reference/tiling-windowing-and-tilebox-parallelism.md` | You need to choose the workflow fanout axis: granules, products, AOIs, time windows, spatial chunks, model tiles, or recursive reductions. It distinguishes Tilebox task chunks from raster windows, internal tiles, web tiles, and storage chunks. |
 | `reference/object-storage-with-obstore.md` | You need object-store access for S3, GCS, Azure, R2, MinIO, local files, streaming reads/writes, listings, Zarr stores, or COG inputs. Prefer this over provider-specific SDKs unless the project already requires them. |
@@ -453,6 +456,8 @@ Prefer:
 | `reference/cloud-optimized-geotiff-outputs.md` | You need final raster outputs. It covers COG defaults, tiling, overviews, compression, nodata/masks, validation, and the difference between a plain GeoTIFF and a valid COG. |
 | `reference/crs-reprojection-and-regridding.md` | You need to choose a target CRS/grid, reproject rasters, align products, or resample/regrid data. Prefer `odc.geo` reprojection for Tilebox geospatial workflows unless another library better fits the data model. |
 | `reference/masking-nodata-and-qa.md` | You need to handle nodata, masks, alpha bands, NaNs, QA layers, cloud masks, or morphology. It highlights mask polarity and dtype-safe choices. |
+| `reference/time-series-compositing-and-visualization.md` | You need a timelapse, cloud-free or periodic composite, before/after comparison, consistently styled frame sequence, or encoded video with traceable source timestamps. |
+| `reference/sentinel-1-sar-patterns.md` | You are working with Sentinel-1 or SAR for flood mapping, maritime/ship detection, surface change, or deformation, and need product selection, preprocessing consistency, false-positive controls, and validation guidance. |
 | `reference/sentinel-2-patterns.md` | You are working with Sentinel-2 products, especially Copernicus archive JP2 assets, SCL, band resolutions, cloud cover, processing baselines, reflectance scaling, or COG alternatives. |
 | `reference/landsat-8-9-patterns.md` | You are working with Landsat 8/9 OLI/TIRS Collection 2 products, especially USGS L2 COG assets, Tilebox `L2_SR`/`L2_ST` collections, QA_PIXEL masks, scale factors, WRS path/row, or surface reflectance/temperature outputs. |
 | `reference/xarray-and-rioxarray.md` | You need labeled multidimensional arrays, rioxarray/odc metadata handling, bounded lazy reads, or xarray reads from Zarr. It keeps Tilebox tasks as the workflow-level execution model. |
@@ -478,6 +483,7 @@ Before considering workflow-code changes complete:
 10. Add custom spans around expensive I/O, compute, and publish phases when debugging or performance matters.
 11. For scaffolded release projects, run `tilebox workflow build-release --debug --json` after editing generated task code.
 12. Run the narrowest local check available: unit tests for pure helpers, import/type checks for task modules, or a small submitted job against a known runner.
+13. For Earth observation outputs, verify source coverage, sensor and resolution suitability, spatial/temporal alignment, provenance, and at least one representative output rather than assuming successful task execution implies a scientifically valid product.
 
 ## Reference Patterns From Examples
 

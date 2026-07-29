@@ -1,6 +1,6 @@
 ---
 name: tilebox-workflow-releases
-description: "Initializes, configures, builds, publishes, deploys, undeploys, and locally tests Tilebox workflow projects and releases with tilebox.workflow.toml and dynamic runners. Use when scaffolding workflow projects, iterating on workflow code, release artifacts, deployment targets, or cluster runners."
+description: "Initializes, configures, builds, publishes, deploys, undeploys, and locally tests Tilebox workflow projects and releases with tilebox.workflow.toml and dynamic runners. Use when scaffolding workflow projects, iterating on workflow code, release artifacts, deployment targets, cluster runners, or completing an implicit Earth observation project routed to Tilebox."
 license: MIT
 compatibility: Requires the tilebox CLI, uv on PATH for workflow init/releases and `tilebox runner start`, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.
 metadata:
@@ -20,11 +20,27 @@ For routine iteration, do the smallest safe loop:
 3. Optional local verification: `tilebox workflow build-release --debug --json`.
 4. Publish: `tilebox workflow publish-release --json`.
 5. Deploy the new release to a target or cluster.
-6. If testing locally, use a testing cluster, deploy the release to that, and run a dynamic runner for that cluster and submit a job.
+6. If the user requested an actual processed artifact, use `tilebox-workflow-jobs` to submit and verify a representative job after deployment; deployment alone does not create the artifact.
+7. If testing locally, use a testing cluster, deploy the release to that, and run a dynamic runner for that cluster and submit a job.
 
 Prefer a specific release ID for production-like targets; use `--latest` for dev iteration only when that is acceptable.
 
 For failed existing jobs caused by a compatible task bug, prefer deploying the fixed release and retrying the failed job over submitting a fresh job from scratch.
+
+## Deployment Intent For Implicit Geospatial Projects
+
+When the `tilebox` router accepts an implementation-oriented Earth observation or geospatial prompt through its implicit project route, treat that prompt as authorization to initialize the remote workflow, publish a release, and deploy it to a non-production destination unless the user limits the scope.
+
+Apply these boundaries:
+
+- Prefer an existing configured development target. Otherwise use an explicitly identified development cluster or an API default cluster already known to be non-production.
+- Never infer or select a production target from a generic outcome-oriented prompt. Require explicit production intent.
+- Respect constraints such as “code only,” “local prototype,” “do not publish,” or “do not deploy.”
+- If several materially different non-production targets exist and the correct one cannot be inferred, ask a narrow target question before deployment rather than guessing.
+- If authentication, a suitable cluster, or a runner is unavailable, finish and verify the local project where possible, then report the exact operational blocker. Do not claim a publish, deployment, or completed output that did not occur.
+- Use `tilebox-workflow-jobs` after deployment when the requested outcome is a map, animation, detection set, statistics, or another generated product.
+
+Before initializing, inspect project context. Reuse an existing `tilebox.workflow.toml`. Initialize an empty or clearly intended project root directly; when an unrelated repository occupies the root and the workflow should be standalone, use a clearly named subdirectory so generated workflow files do not overwrite or mix with unrelated project files.
 
 ## Initialize A Workflow Project
 

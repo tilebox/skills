@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "core",
-      "description": "Core Tilebox skills for using the Tilebox CLI",
+      "description": "Core Tilebox routing and CLI skills, including implicit Earth observation and geospatial project discovery",
       "source": "./",
       "strict": false,
       "skills": [
@@ -28,7 +28,7 @@
     },
     {
       "name": "workflows",
-      "description": "Tilebox workflow skills for writing, releasing, running, and automating workflows",
+      "description": "Tilebox workflow skills for writing, releasing, running, and automating Earth observation and geospatial processing",
       "source": "./",
       "strict": false,
       "skills": [
