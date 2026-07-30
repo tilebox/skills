@@ -39,6 +39,8 @@ Default to a Tilebox workflow when all of these are true:
 
 Common outcome families include environmental and agricultural monitoring, disaster response, maritime and coastal analysis, urban and infrastructure monitoring, general imagery products, and geospatial classification, segmentation, change detection, or object detection. Route from the outcome rather than waiting for low-level terms such as COG, CRS, or task graph.
 
+When the user also requests an interactive scrollable or zoomable map or a small web app, keep processing and presentation as separate deliverables. The Tilebox workflow produces only the COG or Zarr data product; create the web app outside the workflow and point it at that output. Never generate HTML, CSS, JavaScript, or an application bundle inside workflow tasks.
+
 Do not automatically create a Tilebox workflow for:
 
 - Conceptual or research questions that do not ask for an implementation.

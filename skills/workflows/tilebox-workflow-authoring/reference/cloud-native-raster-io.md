@@ -1,6 +1,6 @@
 # Cloud-Native Raster IO
 
-Prefer `async-geotiff` for GeoTIFF and Cloud Optimized GeoTIFF reads when applicable. It integrates with `obstore`, supports window/overview reads, exposes CRS/transform metadata, handles masks, and avoids a GDAL dependency for read-only COG access.
+For GeoTIFF or COG assets returned by a Tilebox dataset, prefer the asset-aware API in `tilebox.storage.aio`. It resolves canonical locations into reusable `obstore` stores, then opens the native `async-geotiff.GeoTIFF` without reading pixels. Use direct `async-geotiff` and `obstore` construction only when an input is not represented by a Tilebox asset.
 
 It is fine to use `async-geotiff` from otherwise synchronous Tilebox task code by running the async call in the task's local execution context. Keep Tilebox subtasks as the workflow-level parallelism.
 
@@ -12,20 +12,31 @@ It is fine to use `async-geotiff` from otherwise synchronous Tilebox task code b
 - Read-only pipelines that do not need warping/resampling.
 - Integrating with `obstore` stores for S3/GCS/Azure/S3-compatible backends.
 
-Sketch:
+GeoTIFF support is included in `tilebox-storage`. Bounds use the order `(west, south, east, north)`: west is minimum longitude/x, south is minimum latitude/y, east is maximum longitude/x, and north is maximum latitude/y. For example, given one selected datapoint, an asset key, and a WGS84 AOI over New York:
 
 ```python
-from async_geotiff import GeoTIFF, Window
-from obstore.store import S3Store
+from tilebox.datasets.assets import AssetCollection
+from tilebox.storage.aio import Client as StorageClient
+from tilebox.storage.geotiff import window_from_bounds
 
-store = S3Store(bucket="sentinel-cogs", region="us-west-2", skip_signature=True)
-gtiff = await GeoTIFF.open("path/to/image.tif", store=store)
-tile = await gtiff.read(window=Window(col_off=x0, row_off=y0, width=w, height=h))
+bounds = (-74.05, 40.68, -73.90, 40.83)  # west, south, east, north
+assets = AssetCollection.from_datapoint(datapoint)
+storage = StorageClient()
+gtiff = await storage.open_geotiff(assets[asset_key])
+window = window_from_bounds(
+    gtiff,
+    bounds=bounds,
+    crs="EPSG:4326",
+    require_fully_contained=True,
+)
+tile = await gtiff.read(window=window)
 arr = tile.data
 mask = tile.mask
 ```
 
-Check the current API before copying exact calls; prefer docs/local package introspection for version-specific details.
+The `crs` argument describes the supplied bounds; `window_from_bounds(...)` transforms them into the GeoTIFF CRS. Never pass longitude/latitude bounds with the raster CRS as their label. When calculating windows without this helper, transform the AOI into the raster CRS first.
+
+The new `Client` exists only in `tilebox.storage.aio`. `resolve(...)` is synchronous and network-free; all data reads are async. Public locations without authentication references are configured anonymously. `AssetCollection.from_datapoint(...)` accepts exactly one datapoint, so select one result or use `tilebox.datasets.iter_datapoints(...)` first. The client does not automatically apply scale/offset, nodata, masks, alignment, reprojection, or resampling.
 
 ## Use Rasterio/GDAL When Needed
 

@@ -42,7 +42,7 @@ Use one of these instead:
 Add only what the workflow uses, but prefer:
 
 - `obstore` for object storage.
-- `async-geotiff` for COG/GeoTIFF reads.
+- `tilebox-storage` for asset-aware COG/GeoTIFF reads; it includes the async storage client and compatible `async-geotiff` dependency.
 - `zarr` for direct Zarr writes.
 - `xarray` for labeled reads from Zarr/NetCDF-like data.
 - `odc-geo` for common geospatial reprojection/grid handling.

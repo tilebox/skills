@@ -11,7 +11,7 @@ Establish the smallest output that satisfies the request:
 - **Time:** event date, before/after windows, recurrence, or complete time-series interval.
 - **Scale:** required ground resolution, output CRS/grid, and whether the product is regional or local.
 - **Quality:** acceptable uncertainty, confidence thresholds, false-positive tolerance, and validation expectations.
-- **Delivery:** COG, GeoParquet, Zarr, image/video, object-store prefix, dataset, or another requested format; add a manifest only when requested or useful enough to justify it.
+- **Delivery:** COG, GeoParquet, Zarr, image/video, object-store prefix, dataset, or another requested format; add a manifest only when requested or useful enough to justify it. For an interactive map or web app, the workflow delivery is COG or Zarr data rather than application files.
 
 Keep run-specific AOI, time, event, and output choices as root-task inputs instead of hardcoding them. Concrete values can be supplied at job submission after authoring. Submit technical values such as coordinates, small GeoJSON, timestamps, or identifiers; store a large geometry separately and submit its compact key. Resolve named public places before submission and never guess a private AOI.
 
@@ -28,6 +28,12 @@ Source imagery storage and workflow output storage are separate decisions. Publi
 | Transition from local to remote | Warn that local paths will not be shared or preserved and guide the user through output-storage setup before starting remote runners. |
 
 Until Tilebox-hosted output storage exists, do not imply that a Tilebox API key provides an output bucket. For simple quickstarts, prefer a local result over forcing the user to configure a bucket. Keep the workflow structure honest: if fanout tasks must exchange large data, local-only output is no longer a safe simplification.
+
+## Keep Interactive Applications Outside The Workflow
+
+When the requested result includes a scrollable or zoomable map, dashboard, or small web application, split the implementation at the data boundary. Workflow tasks process and publish the COG or Zarr product. Build the application separately and configure it to read the workflow's durable output URL or object key as its input.
+
+Do not make workflow tasks write HTML, CSS, JavaScript, frontend bundles, or application scaffolding. Do not embed a web server or UI build step in the task graph. If the user requests both processing and a viewer, deliver two separate components with independent dependencies and lifecycles; the web app consumes the workflow output but is not itself a workflow output.
 
 ## Distinguish Similar-Sounding Outcomes
 

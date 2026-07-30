@@ -23,7 +23,7 @@ Direct authoritative resources:
 4. Generated code should read explicitly documented environment variables and pass their values to `CopernicusStorageClient`; do not hardcode credentials.
 5. Validate credentials with the smallest possible listing, metadata lookup, or product/asset read before starting bulk processing.
 
-Example application-level convention:
+The legacy `open_data.copernicus.*` datasets are not yet compatible with `AssetCollection`. As a temporary compatibility exception, use the deprecated `CopernicusStorageClient` to download a selected product:
 
 ```python
 import os
@@ -36,9 +36,10 @@ storage = CopernicusStorageClient(
     secret_access_key=os.environ["COPERNICUS_SECRET_ACCESS_KEY"],
     cache_directory=Path("./data"),
 )
+storage.download(datapoint, show_progress=True)
 ```
 
-These environment variable names are a project convention, not an assertion that the SDK reads them automatically. Document whichever names the generated project chooses.
+These environment variable names are a project convention, not an assertion that the SDK reads them automatically. Document whichever names the generated project chooses. Do not call `AssetCollection.from_datapoint(...)` for these legacy datasets. Return to the generic asset API once their metadata becomes compatible.
 
 ## Deployment Boundary
 

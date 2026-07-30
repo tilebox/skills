@@ -11,7 +11,7 @@ Define:
 - Sensor, product level, bands, and quality layers.
 - Frame selection rule when several scenes cover the same period.
 - Missing-period behavior: omit, hold, interpolate only when scientifically justified, or render an explicit no-data frame.
-- Final product: frames, contact sheet, MP4/WebM/GIF, periodic COGs, Zarr cube, or an interactive-ready manifest.
+- Final product: frames, contact sheet, MP4/WebM/GIF, periodic COGs, or a Zarr cube. For an interactive timeline or map, publish COG or Zarr data for a separate application to consume.
 
 Sort by acquisition time from source metadata, not filenames. Preserve source timestamps and product IDs in output metadata when practical. A separate manifest is optional: recommend it when useful for provenance or downstream consumption, but do not require it for a simple requested artifact such as a GIF.
 
@@ -68,6 +68,8 @@ Add progress totals for selected scenes, composites, and rendered frames. Keep f
 ## Encode And Publish Visual Outputs
 
 Declare encoder and image dependencies in `pyproject.toml`; do not assume an undeclared system encoder exists on every runner. Choose a format based on the user's delivery needs and runtime support:
+
+Interactive applications are separate consumers, not visual artifacts encoded by the workflow. Keep the workflow output data-only as COG or Zarr, and never generate HTML, CSS, JavaScript, or frontend bundles in a workflow task.
 
 - MP4 for broadly compatible video when the selected codec/runtime supports it.
 - WebM when web delivery and its codec support are appropriate.

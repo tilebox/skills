@@ -304,35 +304,24 @@ Dataset rules:
 
 ## Choose Storage Access Based On Data Format
 
-Tilebox datasets index metadata; they usually do not host open-data product bytes. For public COG sources such as `open_data.aws_earth.sentinel2`, prefer credentials-free cloud-native reads. Use Tilebox storage clients when the selected provider requires authentication or the task needs whole files or provider-specific path behavior.
+Tilebox datasets index metadata and canonical assets; they usually do not host open-data product bytes. Decode exactly one selected datapoint with `AssetCollection.from_datapoint(...)`, then use the async asset API from `tilebox.storage.aio`. Its resolver selects a compatible declared location without a network request, configures anonymous stores when no authentication is referenced, and reuses stores with matching access configuration. Do not probe locations.
 
-**TODO(storage API):** Revisit the concrete storage-client versus cloud-native accessor guidance in this section after the in-progress Tilebox Python storage API design is finalized.
+Use `open_geotiff(...)` for bounded GeoTIFF/COG reads, `download(...)` for an exact local destination file, `iter_bytes(...)` for streaming, and `read_bytes(...)` only for suitably bounded objects. GeoTIFF support is included in `tilebox-storage`. The new API is async-only: import `Client` from `tilebox.storage.aio`, not `tilebox.storage`.
 
-Use storage clients for:
-
-- Whole-file products such as JP2, classic GeoTIFF, HDF5, NetCDF, and product directories.
-- Provider-specific auth, requester-pays, path normalization, quicklooks, caching, or listings.
-- Workflows that know exact assets and can download only needed bands/QA files.
-
-Use cloud-native reads directly for COG, Zarr, or cloud-optimized NetCDF when partial spatial/temporal reads materially reduce bytes transferred.
-
-Authenticated Copernicus storage-client alternative:
+Given one selected datapoint:
 
 ```python
-from pathlib import Path
+from tilebox.datasets.assets import AssetCollection
+from tilebox.storage.aio import Client as StorageClient
 
-from tilebox.storage import CopernicusStorageClient
-
-
-storage = CopernicusStorageClient(
-    access_key,
-    secret_access_key,
-    Path("s2-data"),
-)
-storage.download(scene_datapoint, show_progress=True)
+assets = AssetCollection.from_datapoint(datapoint)
+storage = StorageClient()
+asset = assets[asset_key]
+resolved = storage.resolve(asset)  # synchronous and network-free
+geotiff = await storage.open_geotiff(asset)
 ```
 
-Keep downloads inside the task that consumes the files. Do not pass downloaded local paths to later tasks; pass product IDs or object-store keys instead.
+`AssetCollection.from_datapoint(...)` rejects multi-datapoint input; select with `data.isel(time=index)` or iterate with `tilebox.datasets.iter_datapoints(data)`. Do not reconstruct or normalize asset hrefs. Apply scale/offset, nodata, masks, alignment, and reprojection explicitly. Keep downloads inside the consuming task and pass product IDs or object keys—not local paths—to later tasks. Legacy `open_data.copernicus.*` datasets are not yet asset-compatible; temporarily use the deprecated `CopernicusStorageClient` for them.
 
 ## Use Cache And External Storage For Shared State
 
@@ -441,8 +430,8 @@ For geospatial workflows, keep Tilebox as the outer parallel execution model. Fa
 Prefer:
 - `obstore` for object-store access.
 - Zarr as the workflow rendezvous/intermediate format for distributed task outputs.
-- COGs as the default final raster output when no output format is specified.
-- `async-geotiff` for COG/GeoTIFF reads when applicable.
+- COGs as the default final raster output when no output format is specified. For interactive map requests, keep the workflow data-only: publish COG or Zarr, create the web app separately, and point it at that output. Never write HTML, CSS, JavaScript, or frontend bundles in workflow tasks.
+- `tilebox.storage.aio` from `tilebox-storage` for Tilebox asset COG/GeoTIFF reads; use direct `async-geotiff` only for inputs not represented by Tilebox assets.
 - Rasterio/GDAL/odc/rioxarray for reprojection, warping, writing, or non-COG formats.
 - `niquests` for new non-storage HTTP calls.
 - `pyproject.toml` + `uv sync` compatible dependency declarations for all workflow dependencies, with no editable installs or local path dependencies.
