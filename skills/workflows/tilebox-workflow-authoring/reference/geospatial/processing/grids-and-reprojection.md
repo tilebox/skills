@@ -1,6 +1,6 @@
 # CRS, Reprojection, And Regridding
 
-Prefer `odc.geo` reprojection for Tilebox geospatial workflows when it fits the data model. Use Rasterio/GDAL, rioxarray, xESMF, or other tools when the data format or operation is better suited to them.
+Prefer `odc.geo` when it fits the data model. Use Rasterio/GDAL, rioxarray, xESMF, or another tool when the format or operation is better suited to it.
 
 ## Concepts
 
@@ -25,7 +25,7 @@ For AOIs supplied in lon/lat, transform bounds to the target CRS before building
 
 ## odc.geo Pattern
 
-The common Tilebox pattern is:
+The common pattern is:
 
 1. Read source array and create a source `GeoBox` from shape, transform, and CRS.
 2. Wrap the array with spatial metadata.
@@ -41,10 +41,14 @@ from rasterio.enums import Resampling
 
 src_grid = GeoBox(shape=arr.shape, affine=src.transform, crs=src.crs)
 da = wrap_xr(xr.DataArray(arr, dims=("y", "x")), gbox=src_grid)
-out = da.odc.reproject(how=target_grid, resampling=Resampling.nearest, dst_nodata=0)
+out = da.odc.reproject(
+    how=target_grid,
+    resampling=Resampling.nearest,
+    dst_nodata=chosen_nodata,
+)
 ```
 
-Check exact APIs against installed `odc-geo` and xarray versions.
+Choose `dst_nodata` from the variable semantics and output dtype; zero is not a safe generic default. A plain xarray object does not preserve geospatial correctness unless CRS/grid metadata and spatial dimensions are explicit. Check exact APIs against installed `odc-geo` and xarray versions.
 
 ## Resampling Choices
 

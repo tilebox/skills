@@ -1,6 +1,6 @@
 # Geospatial Raster Fundamentals
 
-Use this reference before turning geospatial rasters into plain arrays, writing derived rasters, or combining products on a shared grid.
+Use this reference before turning geospatial rasters into plain arrays, writing derived rasters, or combining products on a shared grid. Preserve spatial meaning through every conversion.
 
 ## Raster Data Is Array Values Plus Spatial Metadata
 

@@ -46,7 +46,7 @@ The class meanings and valid list are product-specific.
 
 ## Morphology
 
-Use SciPy for local mask refinement inside a Tilebox task:
+Use SciPy for local mask refinement on bounded arrays:
 
 ```python
 from scipy import ndimage
@@ -55,7 +55,7 @@ cloud_buffer = ndimage.binary_dilation(cloud_mask, iterations=2)
 small_objects = ndimage.label(valid_mask)
 ```
 
-Keep morphology operations bounded to the task chunk, and consider halos/overlap if edge effects matter.
+Keep morphology operations bounded to the processing chunk, and consider halos/overlap if edge effects matter.
 
 ## Reprojection And Masks
 

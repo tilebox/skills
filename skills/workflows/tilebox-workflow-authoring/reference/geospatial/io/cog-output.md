@@ -1,6 +1,6 @@
 # Cloud Optimized GeoTIFF Outputs
 
-If the user asks for raster output and does not specify a format, produce Cloud Optimized GeoTIFFs (COGs) by default. Use Zarr for distributed workflow intermediates and datacubes when it makes sense; for small compact intermediates, `context.job_cache` or pickled cache values can also be enough. Use COGs for final 2D/3D raster products intended for cloud access, visualization, or broad geospatial compatibility.
+If a raster output format is unspecified, Cloud Optimized GeoTIFF (COG) is a strong default for final 2D/3D products intended for cloud access, visualization, or broad geospatial compatibility. Use Zarr for high-dimensional datacubes and shared array intermediates.
 
 ## COG Is Appropriate For
 
@@ -23,7 +23,7 @@ A valid COG needs:
 - correct nodata/mask/alpha metadata
 - appropriate compression
 
-Do not call a plain tiled GeoTIFF a COG without validation.
+Do not call a plain tiled GeoTIFF a COG. Produce it with a COG-aware driver/library and test the writer configuration on a representative output.
 
 ## Writing Tools
 
@@ -57,16 +57,18 @@ Use 256 or 512 internal tiles unless access patterns justify another size. Match
 - Set nodata/mask metadata explicitly.
 - Avoid lossy compression with nodata sentinels that can bleed into valid pixels.
 - Prefer internal masks/alpha for visualization products when appropriate.
-- Validate that nodata remains correct after conversion.
+- When developing or changing the writer configuration, confirm that nodata remains correct after conversion.
 
-## Validate
+## Validate Inputs Or Writer Configuration
 
-Run a COG validator when possible:
+Run a COG validator when inspecting an unfamiliar input COG or testing a new or changed output writer configuration:
 
 ```bash
 rio cogeo validate output.tif
 ```
 
-Also inspect CRS, transform, bounds, dtype, band descriptions, nodata/masks, overviews, and file size.
+For produced COGs, prefer a correctly configured COG-aware writer and validate representative output in development or CI. Do not make every workflow task run a validator over every COG it produces. Per-output runtime validation is warranted only when an explicit trust boundary or product requirement justifies the extra read and cost.
+
+During development, also inspect CRS, transform, bounds, dtype, band descriptions, nodata/masks, overviews, and file size.
 
 References: Cloud-Native Geospatial COG guide, cogeo.org developer guide, GDAL COG/GTiff docs, rio-cogeo docs.
