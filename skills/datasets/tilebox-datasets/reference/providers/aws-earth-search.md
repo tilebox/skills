@@ -26,8 +26,25 @@ Do not switch to Copernicus Data Space merely because both index Sentinel-2. Use
 1. Run `tilebox dataset get open_data.aws_earth.sentinel2 --json` and inspect `L2A`, fields, and asset/storage descriptions.
 2. Query a small AOI/time sample and inspect the actual `assets` and `storage` values returned by the SDK.
 3. Use the Tilebox dataset as the discovery mirror. Do not send separate search or catalogue requests to the Earth Search STAC API.
-4. **TODO(storage API):** Update the concrete asset/store selection and cloud-native read pattern after the in-progress Tilebox Python storage API design is finalized.
+4. Convert one selected datapoint with `AssetCollection.from_datapoint(...)`, then pass the required asset to `tilebox.storage.aio`. The resolver selects a compatible S3 or HTTPS location and configures unsigned access automatically when the location has no authentication requirement.
 5. Validate one small band/window read through the chosen accessor before building the full workflow.
+
+With `tilebox-storage` installed, read COGs directly through the asset API. Given one selected datapoint and AOI bounds `(west, south, east, north)`:
+
+```python
+from tilebox.datasets.assets import AssetCollection
+from tilebox.storage.aio import open_geotiff
+from tilebox.storage.geotiff import window_from_bounds
+
+assets = AssetCollection.from_datapoint(datapoint)
+geotiff = await open_geotiff(assets["red"])
+window = window_from_bounds(
+    geotiff, bounds, crs="EPSG:4326", require_fully_contained=True
+)
+tile = await geotiff.read(window=window)
+```
+
+`AssetCollection.from_datapoint(...)` accepts exactly one datapoint; use `data.isel(time=index)` or `tilebox.datasets.iter_datapoints(data)` after a multi-result query. Inspect `list(assets)` rather than assuming every dataset uses the same keys. `open_geotiff(...)` opens metadata but does not read pixels or apply scale, offset, nodata, masks, or reprojection.
 
 An AWS CLI diagnostic can confirm unsigned bucket access without creating credentials:
 
@@ -35,7 +52,7 @@ An AWS CLI diagnostic can confirm unsigned bucket access without creating creden
 aws s3 ls --no-sign-request s3://e84-earth-search-sentinel-data/ --region us-west-2
 ```
 
-Do not add AWS credentials to a credentials-free workflow. If a library automatically attempts signed access, configure that client/store for anonymous or unsigned requests rather than asking the user to create an AWS account.
+Do not add AWS credentials to this credentials-free workflow or construct a signed S3 client manually. The asset resolver sees that the public location has no authentication reference and creates an unsigned store.
 
 ## Output Storage Is Separate
 

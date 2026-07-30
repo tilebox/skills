@@ -9,13 +9,11 @@ metadata:
 
 # Writing Tilebox Workflows
 
-Use this skill when creating or modifying Python Tilebox workflow code, including Earth observation or geospatial processing routed to Tilebox from an outcome-oriented prompt. Keep the scope to workflow source code and local/runtime iteration.
+Create or modify Python workflow source code and local/runtime behavior. Keep platform APIs in Tilebox references, portable science and IO in geospatial references, and end-to-end combinations in recipes.
 
-## Refresh Current APIs First
+## Start With Current APIs And The Right Skill
 
-When encountering errors that could be due to unclear, or outdated remembered APIs, check the current docs or local package version for the exact API surface you are using:
-
-For example:
+When an API is unclear or remembered behavior may be stale, inspect the installed version or search current docs:
 
 ```bash
 tilebox docs search "Task ExecutionContext submit_subtasks"
@@ -23,56 +21,33 @@ tilebox docs search "logging tracing context.logger context.tracer"
 tilebox docs search "caches job_cache"
 ```
 
-Use these companion skills when the task crosses into operations:
+Delegate adjacent ownership:
 
-- `tilebox-cli` for CLI discovery, authentication, JSON output, and docs search.
-- `tilebox-workflow-releases` for `tilebox workflow init`, project config, release publishing, deployment, and runners.
-- `tilebox-workflow-jobs` for submitting, listing, waiting on, debugging, retrying, or canceling jobs.
-- `tilebox-datasets` for target-product source selection, provider access guidance, dataset schema inspection, and CLI datapoint queries.
-- `tilebox-workflow-automations` for cron or storage-triggered workflow automations.
+- `tilebox-workflow-releases`: project initialization, `pyproject.toml` scaffold, build, publish, deploy, and runner configuration.
+- `tilebox-workflow-jobs`: submit, wait, list, inspect, retry, cancel, and cluster operations.
+- `tilebox-datasets`: source/product recommendations, exact dataset slugs, provider credentials, auxiliary catalogues, and CLI inspection.
+- `tilebox-cli`: authentication, CLI discovery, JSON output, and docs search.
+- `tilebox-workflow-automations`: cron and storage-triggered automations.
 
-## Starting A New Workflow Project
+For a new project, use `tilebox workflow init` through `tilebox-workflow-releases`; do not hand-scaffold project configuration. Authoring may edit the generated code after initialization.
 
-When creating a new workflow project from scratch, first use `tilebox workflow init` from the `tilebox-workflow-releases` skill before writing substantial task code. Do not manually create the initial `pyproject.toml`, `tilebox.workflow.toml`, or `runner.py` for a new project.
+## Plan Before Coding
 
-`tilebox workflow init` creates the server-side workflow, scaffolds `tilebox.workflow.toml`, `pyproject.toml`, and `runner.py`, adds the `tilebox` Python dependency, and runs `uv sync`. `uv` is required for workflow initialization, workflow release build/publish validation, and `tilebox runner start`; if it is missing, install or fix `uv` before continuing rather than hand-scaffolding the project.
+For outcome-oriented Earth observation work, read `reference/geospatial/project-planning.md`. Confirm resolution, temporal coverage, observation quality, comparability, required inputs, validation, and delivery. Use `tilebox-datasets` to select and inspect the source; do not duplicate its catalogue or credential guidance.
 
-After initialization, either edit the generated `runner.py` directly for small prototypes or evolve it into an importable package structure as the workflow grows. Keep the configured runner object importable without starting a long-running process at import time.
+Sketch the task graph:
 
-## Translate The Outcome And Plan The Architecture
+1. Identify root, worker, and aggregation stages.
+2. Choose a fanout axis: scenes, products, AOIs, time windows, spatial chunks, or model tiles.
+3. Mark real barriers with `depends_on`; avoid unnecessary chains.
+4. Choose task fields versus `context.job_cache` versus durable object/Zarr artifacts.
+5. Choose retry behavior for idempotent network/storage operations.
 
-For Earth observation requests, first read `reference/earth-observation-project-planning.md` to turn the requested outcome into feasible data, sensor, resolution, temporal, validation, and delivery requirements. Use `reference/time-series-compositing-and-visualization.md` for timelapses, composites, or before/after products and `reference/sentinel-1-sar-patterns.md` for SAR, flood, deformation, or maritime analysis. Do not silently choose a sensor or algorithm that cannot meet the requested scale or accuracy.
+Read `reference/tilebox/tasks-and-graphs.md` for core task semantics, `reference/tilebox/geospatial-task-graphs.md` for geospatial stage mapping, and `reference/tilebox/state-and-artifacts.md` for boundaries.
 
-Then sketch the task graph before coding:
+## Define Typed Tasks
 
-1. Identify the root task and each worker/aggregation stage.
-2. Choose the fanout axis: time windows, scenes/granules, AOIs, chunks, or products.
-3. Mark real barriers with `depends_on`; avoid unnecessary sequential chains.
-4. Decide what data is passed as task inputs versus stored in `context.job_cache` or external object storage.
-5. Choose retry counts for network, storage, or provider operations.
-
-Prefer this shape for scalable workflows:
-
-```diagram
-╭──────────────╮
-│ Root/Stage   │
-│ orchestrator │
-╰──────┬───────╯
-       │ submit_subtasks([...])
-       ▼
-╭────────╮  ╭────────╮  ╭────────╮
-│Worker  │  │Worker  │  │Worker  │
-╰───┬────╯  ╰───┬────╯  ╰───┬────╯
-    ╰───────────┼───────────╯
-                ▼ depends_on=worker_handles
-          ╭────────────╮
-          │ Aggregator │
-          ╰────────────╯
-```
-
-## Define Tasks As Typed Python Classes
-
-Inherit from `Task`; task fields are serializable input parameters. `Task` automatically applies dataclass behavior.
+`Task` applies dataclass behavior; fields are serialized inputs.
 
 ```python
 from tilebox.workflows import ExecutionContext, Task
@@ -80,7 +55,6 @@ from tilebox.workflows import ExecutionContext, Task
 
 class ProcessScene(Task):
     scene_id: str
-    cloud_threshold: float = 20.0
 
     @staticmethod
     def identifier() -> tuple[str, str]:
@@ -88,33 +62,15 @@ class ProcessScene(Task):
 
     def execute(self, context: ExecutionContext) -> None:
         context.current_task.display = f"ProcessScene({self.scene_id})"
-        context.logger.info(
-            "Started scene processing",
-            scene_id=self.scene_id,
-            cloud_threshold=self.cloud_threshold,
-        )
+        context.logger.info("Processing scene", scene_id=self.scene_id)
 ```
 
-Task identifier rules:
+- Default `v0.0` identifiers are acceptable for prototypes. Stable identifiers return `(name, vX.Y)`.
+- Minor versions are forward-compatible; bump major for breaking input/behavior changes.
+- Keep the complete serialized input at most 2048 bytes. Pass compact IDs, bounds, keys, and small config—not arrays, dataframes, xarray datasets, large geometry, manifests, credentials, or local paths.
+- Register every task class used by jobs with the runner.
 
-- Default identifier is the class name with version `v0.0`; fine for prototypes.
-- For stable workflows, define `identifier()` as a `staticmethod` or `classmethod`.
-- Return `(name, version)`, where version matches `vX.Y`.
-- Keep the major version compatible for existing jobs; bump the major version for breaking input/behavior changes.
-- Minor versions are forward-compatible: a runner with `v1.5` can execute a task submitted as `v1.3`, but not the reverse.
-
-Input design:
-
-- The serialized input for each task must be at most 2048 bytes. This limit applies to all dataclass fields and their values together after serialization, including root tasks and every submitted subtask.
-- Keep inputs compact: IDs, time windows, AOI bounds, chunk coordinates, small config values, cache keys, and object prefixes.
-- Do not pass large arrays, large polygons/GeoJSON, manifests, dataframes, xarray datasets, binary data, or thousands of URLs as task parameters.
-- If a task needs more than 2048 bytes of input data, write the data to `context.job_cache` or object storage and pass only a small cache key, object key, or prefix to the task.
-- Pass source identifiers or object-store locations, not local file paths between tasks.
-- Use typed fields and defaults instead of unpacking unstructured dictionaries unless the payload is naturally dynamic.
-
-## Submit Subtasks, Dependencies, Optional Work, And Retries
-
-Use `ExecutionContext` from inside `execute()` to build the job graph dynamically.
+## Build Simple Dynamic Graphs
 
 ```python
 class ProcessScenes(Task):
@@ -122,7 +78,6 @@ class ProcessScenes(Task):
 
     def execute(self, context: ExecutionContext) -> None:
         context.current_task.display = f"ProcessScenes(n={len(self.scene_ids)})"
-
         workers = context.submit_subtasks(
             [ProcessScene(scene_id) for scene_id in self.scene_ids],
             max_retries=3,
@@ -130,368 +85,79 @@ class ProcessScenes(Task):
         context.submit_subtask(PublishSummary(), depends_on=workers)
 ```
 
-Patterns:
+- Use `submit_subtask` for one child and `submit_subtasks` for homogeneous batches.
+- Pass returned handles to `depends_on`; prefer stage barriers over thousands of unique pairwise dependencies.
+- Use `optional=True` only for non-critical work.
+- Make side effects idempotent: deterministic keys, overwrite-safe writes, valid-output checks, or atomic commits. Retrying uses the original task input.
 
-- Use `context.submit_subtask(task)` for one child task.
-- Use `context.submit_subtasks([...])` for homogeneous batches; it returns handles you can pass to `depends_on`.
-- `depends_on` takes a list of submitted task handles and waits for successful completion.
-- Use `optional=True` for non-critical branches whose failure should not fail the whole job.
-- Use `max_retries` for flaky network, object storage, and provider API calls.
-- Keep dependency shapes simple. Prefer stage-level barriers over wiring thousands of pairwise dependencies.
+## Progress And Observability
 
-Avoid fine-grained DAGs that create many unique dependency shapes, such as long chains or `B[i]` depending only on `A[i]` for thousands of `i`. If the fanout is large, use orchestrator/stage tasks that submit homogeneous batches and stage barriers.
+Set concise `current_task.display` labels before expensive work. For meaningful fanout, the submitting task calls `context.progress(name).add(n)` and each successful worker calls `.done(1)` after completing its represented unit. Totals and completions must match.
 
-## Design Tasks To Be Retryable
+Use `context.logger` with structured fields and `logger.bind` for repeated context. In exception handlers, call `logger.exception` and re-raise. Wrap expensive IO/compute/publish phases in `context.tracer.span(...)` and add useful filter attributes. Configure console logging in the runner entrypoint, not task classes.
 
-Tasks can be retried after failures, including after a bug fix has been released to the same cluster. Write task execution to be re-entrant when practical so a failed large workflow can resume from failed tasks instead of requiring a fresh job from the beginning.
+## Dataset, Asset, And Storage Boundaries
 
-Retryable task rules:
+- Query mechanics after source selection: `reference/tilebox/datasets-and-datapoints.md`.
+- Asset decoding and metadata: `reference/tilebox/assets.md`.
+- Asset byte access and bounded COG windows: `reference/tilebox/storage-access.md`.
 
-- Keep side effects safe if the same task input is executed more than once.
-- Write outputs to deterministic keys or paths derived from task inputs.
-- Prefer overwrite-safe writes, existing-output checks, or atomic commit/rename patterns over append-only side effects.
-- Do not emit duplicate external records, notifications, or database rows unless the sink has an idempotency key or deduplication strategy.
-- Keep task input schemas stable. Retrying an old failed job uses the originally submitted task inputs.
-- For backward-compatible bug fixes, keep the task identifier unchanged and bump only the minor version so newer runners can execute older submitted tasks.
-- Bump the major version for breaking input or behavior changes; do not expect a major-version change to repair already-submitted tasks.
+Do not reconstruct provider paths, repeat storage API snippets, or embed source/provider setup. Apply scale/offset, nodata, masks, alignment, and reprojection explicitly. Keep downloads in the consuming task and pass durable IDs/keys—not local paths—to another task.
 
-This retry-and-resume pattern assumes the task input parameters remain compatible and the workflow shape/dependency graph expected by the failed job has not changed drastically.
+## Dependencies And Operations
 
-## Add Progress Labels
+Declare runtime dependencies in `pyproject.toml`, run `uv sync`, and avoid editable/local-path dependencies; see `reference/tilebox/dependencies-and-packaging.md`. Use authoring for source and focused local checks only. Use `tilebox-workflow-releases` for init/build/deploy and `tilebox-workflow-jobs` for submission/wait/clusters.
 
-Set `context.current_task.display` to a concise human-readable label. This label appears in job visualization and makes large graphs easier to debug.
+## Reference Routing
 
-```python
-class ComputeChunk(Task):
-    product_id: str
-    x0: int
-    x1: int
-    y0: int
-    y1: int
-
-    def execute(self, context: ExecutionContext) -> None:
-        context.current_task.display = f"Chunk[{self.x0}:{self.x1},{self.y0}:{self.y1}]"
-        # compute the chunk
-```
-
-Good labels include the runtime dimension that distinguishes tasks:
-
-- `DownloadImages(n=24)`
-- `DownloadImage('S2A_001')`
-- `LocalStats[0:2048,0:2048]`
-- `CombineStats n_pixels=12345678`
-
-Set the label after computing useful values, but before expensive work starts.
-
-## Track Progress For Meaningful Fanout
-
-Use Tilebox progress indicators when a task submits a list of subtasks large enough that users benefit from knowing how many units are done. Progress indicators use a `done` / `total` model: `context.progress("name").add(n)` increases the total work, and `context.progress("name").done(n)` increases completed work. The job's progress is the sum of task-level progress reports, and Tilebox avoids double-counting retried tasks by only considering the last execution of a task.
-
-For fanout workflows, use this rule of thumb:
-
-- Call `progress("name").add(n)` in the task that submits `n` subtasks.
-- Call `progress("name").done(1)` in each subtask after its represented unit of work completed successfully, usually at the end of `execute()`.
-- Make the added total and completed count match: if the parent adds `n`, exactly `n` successful subtasks should collectively call `done(1)` for that indicator.
-- Use named indicators for distinct stages such as `download`, `process`, `upload`, or `finalize`.
-- Do not call `progress("name").add(n)` and `progress("name").done(n)` in the same task for subtask completion progress; that advances total and done together, so the indicator never shows useful in-progress state.
-
-Example fanout progress pattern:
-
-```python
-class ProcessScenes(Task):
-    scene_ids: list[str]
-
-    def execute(self, context: ExecutionContext) -> None:
-        context.progress("process-scenes").add(len(self.scene_ids))
-        context.submit_subtasks([
-            ProcessScene(scene_id) for scene_id in self.scene_ids
-        ])
-
-
-class ProcessScene(Task):
-    scene_id: str
-
-    def execute(self, context: ExecutionContext) -> None:
-        # process this scene successfully first
-        context.progress("process-scenes").done(1)
-```
-
-## Use Structured Logs And Custom Spans
-
-Tilebox automatically correlates task logs with job, task, runner, trace, and span metadata. Log through `context.logger` inside tasks.
-
-```python
-class PublishOutput(Task):
-    output_key: str
-
-    def execute(self, context: ExecutionContext) -> None:
-        log = context.logger.bind(output_key=self.output_key)
-        log.info("Publishing output")
-
-        try:
-            with context.tracer.span("publish-output") as span:
-                span.set_attribute("output_key", self.output_key)
-                # upload or publish data
-                log.info("Output published", format="cog")
-        except Exception as error:
-            log.exception("Output publication failed")
-            raise
-```
-
-Logging rules:
-
-- Prefer structured fields (`scene_id=...`, `chunk=...`) over string-only messages.
-- Use `logger.bind(...)` for attributes shared by several records in one task.
-- Use `logger.exception(...)` inside `except` blocks, then re-raise.
-- Use `context.tracer.span("name")` around expensive or failure-prone phases such as download, compute, and publish.
-- Record attributes on spans for dimensions you will filter by later.
-
-For local development, configure console logging in the runner entrypoint, not inside task classes:
-
-```python
-import logging
-
-from tilebox.workflows import Client
-from tilebox.workflows.observability.logging import configure_console_logging
-
-configure_console_logging(level=logging.DEBUG)
-
-client = Client(name="example-runner")
-client.configure_logging(level=logging.DEBUG, runner_level=logging.INFO)
-runner = client.runner(tasks=[ProcessScenes, ProcessScene, PublishSummary])
-runner.run_forever()
-```
-
-## Query Datasets Deliberately
-
-For dataset-driven workflows, inspect the dataset and collections before coding against fields:
-
-```bash
-tilebox dataset get <dataset-slug> --json
-tilebox dataset query <dataset-slug> --collections <collection> --last 7d --limit 5
-```
-
-The field names in `tilebox dataset query` output and dataset schemas correspond to variables/coordinates returned on the Python `xarray.Dataset`. Use the CLI for quick schema and sample-data inspection, then write Python code against those names.
-
-Python query pattern:
-
-```python
-import xarray as xr
-from shapely import Polygon
-from tilebox.datasets import Client as DatasetClient
-from tilebox.datasets.data import TimeInterval
-
-
-def load_sentinel2(aoi: Polygon, start: str, end: str) -> xr.Dataset:
-    dataset = DatasetClient().dataset("open_data.aws_earth.sentinel2")
-    interval = TimeInterval(start=start, end=end)
-
-    return dataset.query(
-        collections=["L2A"],
-        temporal_extent=interval,
-        spatial_extent=aoi,
-        show_progress=True,
-    )
-```
-
-Dataset rules:
-
-- Prefer `dataset.query(collections=[...])` when querying multiple collections at once. If `collections` is omitted, all collections in the dataset are queried.
-- Scope queries with explicit collection names, IDs, or objects when the workflow expects specific products; do not rely on positional collection ordering.
-- Use Shapely geometries (`Polygon`, `MultiPolygon`) for `spatial_extent`, not bbox tuples.
-- Use `skip_data=True` only for fast probes; it omits many fields required for downstream processing.
-- Do not hardcode assumptions about `location` or provider path formats. Inspect schema examples and sample datapoints.
-
-## Choose Storage Access Based On Data Format
-
-Tilebox datasets index metadata; they usually do not host open-data product bytes. For public COG sources such as `open_data.aws_earth.sentinel2`, prefer credentials-free cloud-native reads. Use Tilebox storage clients when the selected provider requires authentication or the task needs whole files or provider-specific path behavior.
-
-**TODO(storage API):** Revisit the concrete storage-client versus cloud-native accessor guidance in this section after the in-progress Tilebox Python storage API design is finalized.
-
-Use storage clients for:
-
-- Whole-file products such as JP2, classic GeoTIFF, HDF5, NetCDF, and product directories.
-- Provider-specific auth, requester-pays, path normalization, quicklooks, caching, or listings.
-- Workflows that know exact assets and can download only needed bands/QA files.
-
-Use cloud-native reads directly for COG, Zarr, or cloud-optimized NetCDF when partial spatial/temporal reads materially reduce bytes transferred.
-
-Authenticated Copernicus storage-client alternative:
-
-```python
-from pathlib import Path
-
-from tilebox.storage import CopernicusStorageClient
-
-
-storage = CopernicusStorageClient(
-    access_key,
-    secret_access_key,
-    Path("s2-data"),
-)
-storage.download(scene_datapoint, show_progress=True)
-```
-
-Keep downloads inside the task that consumes the files. Do not pass downloaded local paths to later tasks; pass product IDs or object-store keys instead.
-
-## Use Cache And External Storage For Shared State
-
-`context.job_cache` is a job-scoped key-value store shared by tasks in one job. Values are bytes.
-
-```python
-import pickle
-
-
-class LoadMetadata(Task):
-    def execute(self, context: ExecutionContext) -> None:
-        metadata = ...
-        context.job_cache["metadata"] = pickle.dumps(metadata)
-
-
-class SelectProducts(Task):
-    def execute(self, context: ExecutionContext) -> None:
-        metadata = pickle.loads(context.job_cache["metadata"])
-        products = select_products(metadata)
-        context.job_cache["products"] = "\n".join(products).encode()
-```
-
-When a subtask would need an input payload larger than 2048 bytes, cache the payload and pass a compact key instead:
-
-```python
-import hashlib
-import json
-
-
-class ProcessArea(Task):
-    aoi_key: str
-
-    def execute(self, context: ExecutionContext) -> None:
-        aoi = json.loads(context.job_cache[self.aoi_key])
-        # process the AOI
-
-
-class SplitAreas(Task):
-    def execute(self, context: ExecutionContext) -> None:
-        tasks = []
-        for aoi in build_large_geojson_aois():
-            payload = json.dumps(aoi, separators=(",", ":")).encode()
-            key = f"aoi/{hashlib.sha256(payload).hexdigest()}"
-            context.job_cache[key] = payload
-            tasks.append(ProcessArea(aoi_key=key))
-
-        context.submit_subtasks(tasks)
-```
-
-Cache rules:
-
-- Use `job_cache` for compact intermediate data shared within one job.
-- Use `job_cache` or object storage for any payload that would make a task's serialized dataclass input exceed 2048 bytes; pass only the cache key or object key as the task field.
-- Prefix keys by product, stage, or task when multiple branches write similar values.
-- Store large manifests or large intermediates in object storage and pass a small key/prefix to tasks.
-- Treat local filesystem caches as development/local-runner state unless the runner environment guarantees shared access.
-- Do not commit large model weights or static runtime artifacts into workflow source, pass them through task inputs, or store them in `job_cache`.
-- For reusable runner-local assets such as ML checkpoints, fetch lazily into a deterministic cache path under `~/.cache/tilebox/...`, validate before use, and redownload if incomplete or corrupt.
-- For private runtime assets, lazy-load from a private bucket that deployed runners can access; if none exists, ask the user to set one up first.
-- Cache expensive in-memory objects such as loaded models with `functools.lru_cache` when safe, but keep the workflow correct on a cold runner with an empty cache.
-
-Runner cache examples:
-
-```python
-from tilebox.workflows.cache import LocalFileSystemCache
-
-runner = client.runner(tasks=[ProcessScenes, ProcessScene], cache=LocalFileSystemCache())
-```
-
-## Run And Submit For Iteration
-
-Runner entrypoint pattern:
-
-```python
-from tilebox.workflows import Client
-
-from my_workflow import ProcessScene, ProcessScenes, PublishSummary
-
-
-client = Client(name="example-runner")
-runner = client.runner(tasks=[ProcessScenes, ProcessScene, PublishSummary])
-runner.run_forever()
-```
-
-Use `runner.run_all()` for notebooks or scripts that should drain currently available work and return. Use `runner.run_forever()` for long-running runner processes.
-
-Python job submission pattern:
-
-```python
-from tilebox.workflows import Client
-
-job = Client().jobs().submit(
-    "process-scenes",
-    ProcessScenes(scene_ids=["S2A_001", "S2B_002"]),
-    max_retries=1,
-)
-print(job.id)
-```
-
-For CLI submission, use the `tilebox-workflow-jobs` skill so the payload matches Python task serialization rules.
-
-## Geospatial Earth-Data References
-
-For geospatial workflows, keep Tilebox as the outer parallel execution model. Fan out across granules, AOIs, products, windows, chunks, and model tiles with `context.submit_subtask(s)`.
-
-Prefer:
-- `obstore` for object-store access.
-- Zarr as the workflow rendezvous/intermediate format for distributed task outputs.
-- COGs as the default final raster output when no output format is specified.
-- `async-geotiff` for COG/GeoTIFF reads when applicable.
-- Rasterio/GDAL/odc/rioxarray for reprojection, warping, writing, or non-COG formats.
-- `niquests` for new non-storage HTTP calls.
-- `pyproject.toml` + `uv sync` compatible dependency declarations for all workflow dependencies, with no editable installs or local path dependencies.
+### Tilebox Platform
 
 | Reference | Use when |
 | --- | --- |
-| `reference/earth-observation-project-planning.md` | You need to translate a user outcome such as environmental monitoring, crop health, disaster assessment, maritime analysis, urban change, imagery production, or geospatial ML into feasible inputs, sensors, validation, task stages, and outputs. Read this first for implicit Earth observation projects. |
-| `reference/geospatial-raster-fundamentals.md` | You need raster metadata basics: CRS, transform, bounds, resolution, band order, dtype, nodata, masks, and scale/offset. Read this before converting raster-aware objects to NumPy arrays or writing derived rasters. |
-| `reference/tiling-windowing-and-tilebox-parallelism.md` | You need to choose the workflow fanout axis: granules, products, AOIs, time windows, spatial chunks, model tiles, or recursive reductions. It distinguishes Tilebox task chunks from raster windows, internal tiles, web tiles, and storage chunks. |
-| `reference/object-storage-with-obstore.md` | You need object-store access for S3, GCS, Azure, R2, MinIO, local files, streaming reads/writes, listings, Zarr stores, or COG inputs. Prefer this over provider-specific SDKs unless the project already requires them. |
-| `reference/cloud-native-raster-io.md` | You need to read GeoTIFF/COG data efficiently from object storage or HTTP range-readable sources. It covers `async-geotiff`, `obstore`, window reads, overviews, and when Rasterio/GDAL is still the better tool. |
-| `reference/zarr-workflow-rendezvous.md` | You need shared intermediate arrays between Tilebox tasks. It covers direct `zarr` library writes, array initialization, region writes, chunk alignment, deterministic keys, and reading with xarray when convenient. |
-| `reference/cloud-optimized-geotiff-outputs.md` | You need final raster outputs. It covers COG defaults, tiling, overviews, compression, nodata/masks, validation, and the difference between a plain GeoTIFF and a valid COG. |
-| `reference/crs-reprojection-and-regridding.md` | You need to choose a target CRS/grid, reproject rasters, align products, or resample/regrid data. Prefer `odc.geo` reprojection for Tilebox geospatial workflows unless another library better fits the data model. |
-| `reference/masking-nodata-and-qa.md` | You need to handle nodata, masks, alpha bands, NaNs, QA layers, cloud masks, or morphology. It highlights mask polarity and dtype-safe choices. |
-| `reference/time-series-compositing-and-visualization.md` | You need a timelapse, cloud-free or periodic composite, before/after comparison, consistently styled frame sequence, or encoded video with traceable source timestamps. |
-| `reference/sentinel-1-sar-patterns.md` | You are working with Sentinel-1 or SAR for flood mapping, maritime/ship detection, surface change, or deformation, and need product selection, preprocessing consistency, false-positive controls, and validation guidance. |
-| `reference/sentinel-2-patterns.md` | You are working with Sentinel-2 L2A, especially the default public AWS Earth Search COG source, SCL, band resolutions, cloud cover, processing baselines, reflectance scaling, or the authenticated Copernicus archive alternative. |
-| `reference/landsat-8-9-patterns.md` | You are working with Landsat 8/9 OLI/TIRS Collection 2 products, especially USGS L2 COG assets, Tilebox `L2_SR`/`L2_ST` collections, QA_PIXEL masks, scale factors, WRS path/row, or surface reflectance/temperature outputs. |
-| `reference/xarray-and-rioxarray.md` | You need labeled multidimensional arrays, rioxarray/odc metadata handling, bounded lazy reads, or xarray reads from Zarr. It keeps Tilebox tasks as the workflow-level execution model. |
-| `reference/numpy-scipy-raster-patterns.md` | You need efficient local raster math inside one task: band math, masks, histograms, morphology, local statistics, mergeable reductions, or shape/dtype discipline. |
-| `reference/geospatial-ml-inference-patterns.md` | You need tiled geospatial model inference, patch-grid outputs, band normalization, lat/lon/time/GSD model inputs, GPU/CPU handling, lazy model loading, or embedding writes. |
-| `reference/encoding-compression-and-cloud-formats.md` | You need a format decision matrix or encoding/compression guidance for COG, Zarr, NetCDF, Parquet/GeoParquet, dtype, scale/offset, fill values, chunks, and codecs. |
-| `reference/http-requests-with-niquests.md` | You need non-storage HTTP calls, sessions, streaming downloads/uploads, timeouts, rate limits, or async/sync HTTP APIs. Do not use it where `obstore` is the right storage abstraction. |
-| `reference/workflow-dependencies-and-uv.md` | You need to add or review workflow dependencies. It covers `pyproject.toml`, `uv sync`, dev dependency groups, no editable/local path dependencies, architecture-safe packages, PyTorch index markers, and runtime asset handling. |
+| `reference/tilebox/tasks-and-graphs.md` | Defining/versioning tasks, respecting input limits, submitting dependencies, retries, progress, observability, registration, and runner modes. |
+| `reference/tilebox/datasets-and-datapoints.md` | Querying an already-selected dataset, inspecting samples, selecting exactly one datapoint, or iterating datapoints. |
+| `reference/tilebox/assets.md` | Decoding `AssetCollection`, semantic keys, raster metadata, scale/offset, or explicit overrides. |
+| `reference/tilebox/storage-access.md` | Resolving/reading/streaming/downloading/opening Tilebox assets, access policy, anonymous access, windows, or concurrency. |
+| `reference/tilebox/state-and-artifacts.md` | Choosing task inputs, job cache, object/Zarr artifacts, local scratch, and retry-safe keys. |
+| `reference/tilebox/dependencies-and-packaging.md` | Declaring uv-compatible workflow dependencies and release-safe packages. |
+| `reference/tilebox/geospatial-task-graphs.md` | Mapping scenes, windows, chunks, reductions, and progress to Tilebox tasks. |
+
+### Mixed Tilebox + Geospatial Recipes
+
+| Reference | Use when |
+| --- | --- |
+| `reference/tilebox/recipes/sentinel-2-cog.md` | Reading public L2A RGB plus SCL and aligning 20 m classes to 10 m RGB. |
+| `reference/tilebox/recipes/sentinel-1-sar.md` | Building SAR change, flood, or maritime task graphs. |
+| `reference/tilebox/recipes/time-series-composite.md` | Composing aligned scenes or producing timelapses. |
+| `reference/tilebox/recipes/geospatial-ml.md` | Fanning out model tiles and aggregating geospatial predictions. |
+
+### Portable Geospatial
+
+| Reference | Use when |
+| --- | --- |
+| `reference/geospatial/project-planning.md` | Translating an outcome into feasible data, validation, and output requirements. |
+| `reference/geospatial/raster-fundamentals.md` | Handling CRS, transform, shape, dtype, nodata, masks, scale, and units. |
+| `reference/geospatial/io/cloud-native-raster.md` | Direct cloud-native GeoTIFF/COG reads outside canonical assets. |
+| `reference/geospatial/io/object-storage.md` | Using obstore with S3, GCS, Azure, local, or compatible storage. |
+| `reference/geospatial/io/zarr.md` | Designing Zarr schema, chunks, region writes, and labeled reads. |
+| `reference/geospatial/io/cog-output.md` | Writing correct COG rasters and testing inputs or writer configurations when needed. |
+| `reference/geospatial/io/formats-and-encoding.md` | Choosing COG/Zarr/NetCDF/GeoParquet and preserving essential encoding semantics. |
+| `reference/geospatial/processing/grids-and-reprojection.md` | Choosing grids, reprojection, and semantic resampling. |
+| `reference/geospatial/processing/masking-and-qa.md` | Handling nodata, masks, QA, classes, and morphology. |
+| `reference/geospatial/processing/time-series.md` | Aligning, compositing, styling, and validating temporal imagery. |
+| `reference/geospatial/processing/ml-inference.md` | Tiling, loading models, normalization, and prediction outputs. |
+| `reference/geospatial/products/sentinel-1-sar.md` | Understanding SAR product choice, geometry, units, and caveats. |
+| `reference/geospatial/products/sentinel-2-l2a.md` | Understanding L2A bands, resolution, scaling, and SCL. |
+| `reference/geospatial/products/landsat-collection-2.md` | Understanding Landsat Level-2 bands, scaling, and QA bits. |
 
 ## Verification Checklist
 
-Before considering workflow-code changes complete:
-
-1. Ensure every task class used by submitted jobs is registered with the runner.
-2. Ensure task identifiers and versions match between submitter and runner.
-3. Check each task's serialized dataclass input is at most 2048 bytes, including all fields and values together.
-4. Check large or cross-task data uses `job_cache` or object storage instead of task arguments, with only keys/prefixes passed to subtasks.
-5. If the workflow uses large runtime artifacts such as model weights, ensure they are fetched lazily into a runner-local cache and excluded from the release artifact.
-6. If the task may be retried after a fix, confirm execution is re-entrant/idempotent and the task input schema remains compatible with existing failed jobs.
-7. Add `current_task.display` labels for high-fanout tasks.
-8. Add progress indicators for sizable fanout where the total and completed subtask counts are useful to users.
-9. Add structured logs for start, selected counts, skipped/empty cases, and output locations.
-10. Add custom spans around expensive I/O, compute, and publish phases when debugging or performance matters.
-11. For scaffolded release projects, run `tilebox workflow build-release --debug --json` after editing generated task code.
-12. Run the narrowest local check available: unit tests for pure helpers, import/type checks for task modules, or a small submitted job against a known runner.
-13. For Earth observation outputs, verify source coverage, sensor and resolution suitability, spatial/temporal alignment, provenance, and at least one representative output rather than assuming successful task execution implies a scientifically valid product.
-
-## Reference Patterns From Examples
-
-The public `github.com/tilebox/examples` workflows demonstrate these proven patterns:
-
-- Hello-world workflow: minimal `Task`, `submit_subtask`, `submit_subtasks`, `current_task.display`, local runner, and job display.
-- Sentinel-2 download workflow: staged metadata loading, filtering, selection, provider storage download, `depends_on`, `max_retries`, and `LocalFileSystemCache`.
-- Cron automation workflow: `CronTask`, default fields, trigger time windows, dataset queries, and automation retries.
-- Hyperspectral PCA workflow: recursive/scalable fanout, chunk-level display labels, `logger.bind`, `job_cache` keys, and optional cloud-backed runner cache.
+1. All submitted tasks are registered and identifiers/versions agree.
+2. Every serialized task input is at most 2048 bytes.
+3. Cross-task data uses the right state/artifact boundary and deterministic keys.
+4. Retryable execution is re-entrant and input-compatible.
+5. High-fanout tasks have labels, useful progress, structured logs, and spans where warranted.
+6. Dependencies sync and task modules import in the intended environment.
+7. For scaffolded release projects, `tilebox workflow build-release --debug --json` succeeds after editing generated task code.
+8. Pure helpers have focused tests or type/import checks, or the smallest known job runs against a suitable runner.
+9. Earth observation outputs have representative scientific validation, coverage/alignment checks, provenance, and stated limitations.

@@ -14,6 +14,20 @@ For large global or multidimensional arrays, strongly prefer a suitable Zarr or 
 
 Open lazily, subset first, and compute only the bounded task region. Do not download an entire global store. Reproject or interpolate deliberately, preserve units and coordinates, and use nearest-neighbor for categorical masks. Keep auxiliary reads and the consuming product operation in the same task when their fanout axes match; write an intermediate only when a later task needs a different rechunking or fanout axis.
 
+## Credentials-Free Terrain: Mapterhorn
+
+[Mapterhorn](https://mapterhorn.com/data-access/) is a credentials-free elevation source optimized for terrain visualization. It publishes a global Copernicus GLO-30 baseline with higher-resolution regional sources where available as 512-pixel, lossless WebP terrain tiles in the standard XYZ Web Mercator grid. Elevation is encoded in metres using Terrarium RGB. No account or API key is required.
+
+Prefer Mapterhorn for quick terrain visualization, hillshade, contours, and bounded local processing when avoiding provider setup matters more than using a single analysis-native grid. For Python AOI reads, the simplest path is usually the anonymous [XYZ endpoint and TileJSON](https://mapterhorn.com/data-access/#single-tile-http-endpoint), not direct PMTiles access:
+
+1. Choose a zoom that matches the needed effective resolution and current local coverage, then enumerate the XYZ tiles intersecting the AOI.
+2. Fetch `https://tiles.mapterhorn.com/{z}/{x}/{y}.webp`, decode each pixel as `R * 256 + G + B / 256 - 32768` metres, and mosaic the tiles on their EPSG:3857 bounds.
+3. Crop to the exact AOI and reproject once to the workflow's target grid. Preserve the selected zoom, source version, and [required attribution](https://mapterhorn.com/attribution/) with the result.
+
+This does not require downloading the full PMTiles archive. For larger or reusable extracts, use Mapterhorn's documented `pmtiles extract --bbox=...` flow; PMTiles uses HTTP range requests, but extracting, decoding, mosaicking, and reprojection is still more involved than selecting an AOI from a well-chunked Zarr or COG.
+
+Do not treat Mapterhorn as a datum-harmonized scientific DEM. It combines source DEMs and DTMs with different native resolutions and inherited vertical references, is resampled to Web Mercator, and is primarily built for interactive maps. For terrain correction, hydraulic modeling, absolute-elevation comparison, or other datum-sensitive analysis, prefer an analysis-oriented Zarr/COG source such as Copernicus DEM and verify its vertical datum. Use Mapterhorn for such analysis only after confirming that the contributing source, resolution, attribution, and vertical reference over the AOI meet the requirement.
+
 ## Recommended Catalogues
 
 Research all three catalogues when the user has not specified a source. Offer one default based on scientific and operational fit rather than combining mirrors automatically.
