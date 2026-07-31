@@ -11,6 +11,8 @@ metadata:
 
 Use this skill to choose Tilebox datasets from target-product requirements and for operational and design work with datasets: inspection, querying, schema design, creation/update, documentation, collection management, datapoint lookup, and generated types. Prefer the CLI for live catalog inspection and operations.
 
+When the task is to onboard a new STAC catalog, provider XML/JSON source, object-store prefix, or COG file tree and implement its converter, switch to `tilebox-ingesting-datasets`. That skill owns source suitability, representative discovery, STAC 1.1 normalization, canonical Assets/Links/Storage/Authentication mapping, conversion recipes, Python/Go implementation, and ingestion validation. Return here for general live catalog operations and source selection.
+
 ## Refresh CLI Metadata
 
 Check exact installed flags and schemas before relying on memory:

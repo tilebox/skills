@@ -1,6 +1,6 @@
 ---
 name: tilebox
-description: "Routes Tilebox tasks and implementation-oriented Earth observation or geospatial processing. Use for satellite, aerial, SAR, hyperspectral, or raster imagery; AOI and time-series analysis; mosaics, spectral indices, classification, segmentation, change detection, and object detection; or environmental, agricultural, disaster, maritime, urban, and infrastructure monitoring—even when Tilebox is not named. For new processing projects, orchestrates workflow initialization, Python authoring, deployment, and job execution."
+description: "Routes Tilebox tasks and implementation-oriented Earth observation or geospatial processing. Use for satellite, aerial, SAR, hyperspectral, or raster imagery; STAC or provider-catalog ingestion; AOI and time-series analysis; mosaics, spectral indices, classification, segmentation, change detection, and object detection; or environmental, agricultural, disaster, maritime, urban, and infrastructure monitoring—even when Tilebox is not named. For new processing projects, orchestrates workflow initialization, Python authoring, deployment, and job execution."
 license: MIT
 metadata:
   author: tilebox
@@ -18,6 +18,7 @@ Check the user's request and nearby project files to determine the Tilebox surfa
 | --- | --- |
 | `tilebox` shell commands, auth, `--json`, `agent-context`, or docs search | CLI usage |
 | Target product without a named source; dataset or auxiliary DEM/weather/climate selection; metadata-versus-payload access; provider credentials; dataset schemas, collections, datapoints, generated types, or dataset docs | Dataset selection and operations |
+| Onboard or ingest a new STAC catalog, provider XML/JSON API, object-store prefix, COG file tree, or scene metadata source into a canonical Tilebox dataset | Dataset ingestion |
 | Create, build, implement, detect, generate, process, map, monitor, compare, or visualize Earth observation imagery | Implicit geospatial project route below |
 | Satellite, aerial, SAR, hyperspectral, multispectral, or raster imagery; AOIs; time series; mosaics; spectral indices; classification; segmentation; or change/object detection | Workflow code authoring |
 | Python task classes, task graphs, `ExecutionContext`, subtasks, caches, logs, tracing, or geospatial processing code | Workflow code authoring |
@@ -92,6 +93,14 @@ Treat an implementation-oriented prompt accepted by this route as authorization 
 - Collection management
 - Datapoint queries, filters, and lookup
 
+**Ingesting new metadata sources** → Use `tilebox-ingesting-datasets`
+- Dataset suitability checks for scene catalogs versus analysis-ready cubes
+- STAC 1.1 normalization and non-STAC/file-tree source inference
+- Canonical Assets, Links, Storage, and Authentication mapping
+- Schema and collection discovery with consequential decisions recorded
+- Python semantic Assets authoring or generated Go converters
+- Sample validation, query-back, and repeatable ingestion
+
 **Writing workflow task code** → Use `tilebox-workflow-authoring`
 - Python task classes and task graphs
 - Subtasks, dependencies, retries, and fanout patterns
@@ -124,6 +133,7 @@ Use multiple skills when the task spans design, code, release, and operations:
 | User task | Use these skills |
 | --- | --- |
 | Create a dataset and use it from workflow code | `tilebox-datasets` + `tilebox-workflow-authoring` |
+| Onboard a new STAC, XML/API, bucket, or COG-tree source | `tilebox-ingesting-datasets` + `tilebox-cli`; use `tilebox-datasets` for general dataset operations and live inspection |
 | Create or scaffold a new workflow project from scratch | `tilebox-workflow-releases` first to run `tilebox workflow init`, then `tilebox-workflow-authoring` for task code |
 | Build an implicit Earth observation project from an outcome-oriented prompt | `tilebox-datasets` to select/preflight a source when no project/source was specified → `tilebox-workflow-releases` to initialize if needed → `tilebox-workflow-authoring` → `tilebox-workflow-releases` to publish/deploy → `tilebox-workflow-jobs` to produce and verify the result |
 | Publish a workflow change and retry a failed job | `tilebox-workflow-releases` + `tilebox-workflow-jobs` |
@@ -140,6 +150,7 @@ If you know your task, you can directly access:
 
 - `/tilebox-cli` - CLI commands, auth, JSON output, docs search, and command schemas
 - `/tilebox-datasets` - Dataset schemas, collections, datapoints, docs, and generated types
+- `/tilebox-ingesting-datasets` - New source suitability, STAC/non-STAC normalization, schema discovery, converters, and ingestion validation
 - `/tilebox-workflow-authoring` - Python workflow task code, task graphs, subtasks, caches, logs, tracing, and geospatial raster/grid/projection patterns
 - `/tilebox-workflow-releases` - Workflow init, release build/publish, deployment, targets, and runners
 - `/tilebox-workflow-jobs` - Job submission, monitoring, logs, spans, retries, cancellation, and clusters
