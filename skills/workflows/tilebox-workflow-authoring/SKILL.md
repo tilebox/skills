@@ -43,6 +43,14 @@ Sketch the task graph:
 4. Choose task fields versus `context.job_cache` versus durable object/Zarr artifacts.
 5. Choose retry behavior for idempotent network/storage operations.
 
+### Require Task-Level Parallelism
+
+Task-level fanout is a workflow design requirement, not an optional optimization. Whenever the requested output contains two or more independent units—such as scenes, seasonal or other time periods, AOIs, products, spatial chunks, or model tiles—represent those units as separate Tilebox tasks submitted with `context.submit_subtask(s)`. Infer this decomposition from the outcome; never require the user to name `submit_subtasks`, specify task counts, or prescribe a DAG. For example, a 12-scene timelapse that combines all frames requires a graph such as `1 root + 12 scene workers + 1 encoder`, not one task with a 12-iteration loop.
+
+Use an orchestration task to submit independent workers and a separate aggregation or publication task with `depends_on` when the output combines their results. Never hide schedulable fanout inside a sequential loop, `asyncio.gather`, threads, or local multiprocessing in one task; additional runners can only parallelize separate Tilebox tasks. A small first run or scheduling overhead is not a reason to collapse independent work into one task. If the natural units are too fine-grained for individual scheduling, batch them into multiple balanced worker tasks rather than one task. Keep work in one task only when no two units can run independently because the work is genuinely indivisible or dependency-ordered, or when the user explicitly requires single-task execution.
+
+Before coding, record the expected graph shape. After running a representative job, compare `execution_stats.total_tasks` and `task_summaries` with that shape. Progress units and child tracing spans are not tasks and do not prove fanout. If the graph does not match, fix the workflow before reporting completion. When runner capacity permits, use task timestamps or spans to verify that independent workers overlapped.
+
 Read `reference/tilebox/tasks-and-graphs.md` for core task semantics, `reference/tilebox/geospatial-task-graphs.md` for geospatial stage mapping, and `reference/tilebox/state-and-artifacts.md` for boundaries.
 
 ## Define Typed Tasks
@@ -161,3 +169,4 @@ Declare runtime dependencies in `pyproject.toml`, run `uv sync`, and avoid edita
 7. For scaffolded release projects, `tilebox workflow build-release --debug --json` succeeds after editing generated task code.
 8. Pure helpers have focused tests or type/import checks, or the smallest known job runs against a suitable runner.
 9. Earth observation outputs have representative scientific validation, coverage/alignment checks, provenance, and stated limitations.
+10. A representative job's actual task summaries match the planned root, fanout, and aggregation stages; progress counters or child spans are not treated as task fanout.
