@@ -19,11 +19,12 @@
     },
     {
       "name": "datasets",
-      "description": "Tilebox dataset skills for Earth observation and auxiliary-data selection, provider access, collections, datapoints, and schemas",
+      "description": "Tilebox dataset skills for source ingestion, Earth observation and auxiliary-data selection, provider access, collections, datapoints, and schemas",
       "source": "./",
       "strict": false,
       "skills": [
-        "./skills/datasets/tilebox-datasets"
+        "./skills/datasets/tilebox-datasets",
+        "./skills/datasets/tilebox-ingesting-datasets"
       ]
     },
     {

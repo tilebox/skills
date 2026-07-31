@@ -1,0 +1,160 @@
+# Mapping Canonical STAC Into A Tilebox Dataset
+
+Tilebox does not store a complete STAC Item in one monolithic protobuf message. The generated dataset type is the aggregate: required dataset fields hold time and geometry, well-known messages hold dedicated STAC structures, and generated top-level fields hold the remaining canonical Item properties.
+
+## Field Placement
+
+Use this baseline mapping:
+
+| Canonical STAC path | Tilebox representation |
+| --- | --- |
+| `/properties/datetime`, or `/properties/start_datetime` for an interval-only Item | required dataset `time` |
+| `/properties/start_datetime` and `/properties/end_datetime` on an interval-only Item | generated Timestamp fields preserving both bounds |
+| `/geometry` | required spatiotemporal `geometry` |
+| `/links` | `datasets.stac.v1.Links` |
+| `/assets` | `datasets.stac.v1.Assets` |
+| `/properties/auth:schemes` | `datasets.stac.v1.Authentication` |
+| `/properties/storage:schemes` | `datasets.stac.v1.Storage` |
+| `/properties/providers` | repeated `datasets.stac.v1.Provider` |
+| `/properties/processing:software` | `datasets.stac.v1.ProcessingSoftware` |
+| other stable `/properties/...` leaves | generated typed top-level fields |
+
+STAC `id` normally becomes an explicit generated string such as `stac_id`; it is not the Tilebox datapoint UUID. Source collection membership informs routing and is retained as a field only when the approved dataset contract requires it.
+
+## Inspect Current Contracts
+
+Refresh CLI support before creating the schema:
+
+```bash
+tilebox agent-context dataset create --output-schema
+```
+
+Current schema fields support scalar and Tilebox well-known types, fully qualified `datasets.stac.v1` message and enum names, repetition, and these annotations:
+
+- `description`
+- `example_value`
+- `source_json_pointer`
+- `queryable`
+- `json_schema_ref`
+- `roles`, currently including `primary_title`
+
+The protobuf repository is the exact source of message names, fields, enum values, validation, and presence. Relevant packages are:
+
+- `apis/datasets/stac/v1` for Assets, Links, Storage, Authentication, EO/Raster/Projection/View/File/Classification, SAR, Satellite, Product, and Processing;
+- `apis/datasets/v1/dataset_type.proto` for fields and annotations; and
+- Tilebox SDK generated modules for language-specific constructors.
+
+Do not copy pseudo-protobuf from a guide when current generated types are available.
+
+## Minimal Schema Example
+
+This example shows identity, a dedicated message, a repeated message, and a queryable scalar. Add only fields required by the recipe.
+
+```json
+{
+  "kind": "spatiotemporal",
+  "fields": [
+    {
+      "name": "stac_id",
+      "type": "string",
+      "description": "Stable identifier of the source STAC Item.",
+      "example_value": "S2B_T35SLA_20260730T090532_L2A",
+      "source_json_pointer": "/id",
+      "queryable": true,
+      "roles": ["primary_title"]
+    },
+    {
+      "name": "assets",
+      "type": "datasets.stac.v1.Assets",
+      "description": "Canonical STAC 1.1 Assets with semantic locations and Bands.",
+      "source_json_pointer": "/assets"
+    },
+    {
+      "name": "providers",
+      "type": "datasets.stac.v1.Provider",
+      "repeated": true,
+      "description": "Organizations that captured, processed, or host the product.",
+      "source_json_pointer": "/properties/providers"
+    },
+    {
+      "name": "cloud_cover",
+      "type": "float64",
+      "description": "Cloud cover over the scene as a percentage from 0 to 100.",
+      "example_value": "0.057545",
+      "source_json_pointer": "/properties/eo:cloud_cover",
+      "queryable": true
+    }
+  ]
+}
+```
+
+Omit unused optional messages. Examples must use final canonical values, not raw provider fragments. Create the reviewed schema through `tilebox dataset create`, then inspect the stored contract:
+
+```bash
+tilebox dataset get <dataset-slug> --json
+```
+
+## Canonical Source JSON Pointers
+
+`source_json_pointer` is an RFC 6901 pointer to the field's position in the normalized STAC 1.1 semantic model. It is not a pointer into raw provider XML, legacy extension JSON, or an API response.
+
+Examples:
+
+```text
+/assets                                      -> assets
+/links                                       -> links
+/properties/eo:cloud_cover                   -> cloud_cover
+/properties/s2:nodata_pixel_percentage       -> nodata_pixel_percentage
+/properties/storage:schemes                  -> storage
+```
+
+Apply RFC 6901 escaping to `~` and `/`; colons remain literal. Put the canonical pointer on the field and record different raw source paths and transformations in the recipe.
+
+## Field Descriptions And Examples
+
+Describe final meaning, units, ranges, and representation. Keep provider defects and conversion rationale in the recipe. Asset descriptions must state the actual primary/alternate policy.
+
+## Readable Field Names
+
+Remove the leading `properties` segment, retain namespaces that carry meaning, join nested segments with underscores, and normalize invalid characters to lowercase snake case. A source-specific namespace may be dropped only when the dataset context makes the name unambiguous, such as `eo:cloud_cover` to `cloud_cover` in a Sentinel-2-only dataset.
+
+Compare names against every generated, required, dedicated, and reserved field. Stop on collisions; never append hashes, numbers, or order-dependent suffixes automatically.
+
+For example, `/properties/view:azimuth` and `/properties/view_azimuth` both propose `view_azimuth`. Show both paths and ask whether to rename explicitly, keep a typed object, exclude a field, split datasets, or abort.
+
+## Type And Shape Rules
+
+Choose types from the source schema and representative non-null values. Preserve integer/float semantics, stable repeated element types, typed structures, and explicit presence for zero, false, and empty values. Null or missing becomes unset; null-only fields remain omitted until their type is known. Reject incompatible shape changes.
+
+Do not use JSON strings, arbitrary Structs, or `google.protobuf.Value` to force a mixed field into the schema.
+
+## Queryable Fields
+
+Make stable source identity queryable when users need direct record lookup. Add common, stable scalar filters only when a realistic use case and type are clear, such as cloud or nodata percentage, platform, product/processing identifier, orbit value, or projection code.
+
+Inspect a source STAC API's `/queryables` endpoint when available, but treat it as provider evidence rather than a list to copy. Select only fields that remain useful, stable, and correctly typed in the canonical Tilebox schema.
+
+Default large messages, repeated values, Assets, Links, registries, arbitrary structures, and low-value high-cardinality values to non-queryable. Queryable fields support typed filtering; they are not guaranteed secondary indexes.
+
+Use `json_schema_ref` when the STAC Queryables definition identifies the property through a stable `$ref`. Keep the canonical pointer and schema reference separate.
+
+Assign `primary_title` to at most one stable human-readable identity field. Thumbnail selection remains an Asset role, not a field role.
+
+## Item-Level Versus Nested Metadata
+
+Item-level extension properties become generated fields unless a dedicated registry/message applies. Asset/Band values remain inside Assets/Bands; Link access values remain on Links and their registries; Storage and Authentication remain dedicated messages.
+
+The presence of an Asset-level grouping message does not mean the same property at Item scope should be forced into it. Conversely, an unsupported nested field cannot be moved to a top-level field without losing which Asset or Band it described.
+
+## Collection And Schema Boundaries
+
+Use separate datasets when record families cannot share one stable schema. Collection design and routing belong to `source-discovery-and-recipe.md`. Create approved collections before ingestion and regenerate Go types after compatible schema updates.
+
+On non-empty datasets:
+
+- add compatible fields when needed;
+- update descriptions and documentation deliberately;
+- never retype, rename, remove, reorder, or renumber existing fields; and
+- create a new dataset for incompatible wire changes.
+
+Inspect collection counts and the current schema before every update.

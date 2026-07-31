@@ -41,6 +41,7 @@ Install `core`, `datasets`, and `workflows` for implicit Earth observation proje
 | Skill | Purpose | When to Use |
 | --- | --- | --- |
 | `tilebox-datasets` | Select Earth observation and external auxiliary sources, and manage datasets with `tilebox dataset`: live catalog inspection, provider access, schemas, collections, and datapoint queries | Choosing source or supporting DEM/weather/climate data from a target product—or working with dataset schemas, collections, documentation, and datapoints |
+| `tilebox-ingesting-datasets` | Design and implement canonical Tilebox metadata ingestors from STAC, provider XML/JSON, object-store prefixes, and COG file trees | Onboarding a new scene/acquisition catalog, normalizing source metadata to STAC 1.1, designing its schema and collections, authoring a Python or Go converter, or validating ingestion |
 
 ### Workflows
 
@@ -63,6 +64,9 @@ Install `core`, `datasets`, and `workflows` for implicit Earth observation proje
 | "Explain which provider credentials this dataset needs" | `tilebox-datasets` |
 | "Update a dataset description or schema" | `tilebox-datasets` |
 | "Query datapoints from a dataset" | `tilebox-datasets` |
+| "Ingest this STAC catalog into a canonical Tilebox dataset" | `tilebox-ingesting-datasets` |
+| "Build a Tilebox metadata converter from these XML files and COGs" | `tilebox-ingesting-datasets` |
+| "Decide whether this Zarr cube should become a Tilebox catalog" | `tilebox-ingesting-datasets` |
 | "Submit a workflow job from the CLI" | `tilebox-workflow-jobs` |
 | "Check why this Tilebox job failed" | `tilebox-workflow-jobs` |
 | "Get logs and spans for this workflow job" | `tilebox-workflow-jobs` |
@@ -141,8 +145,11 @@ tilebox-skills/
     │   └── tilebox-cli/
     │       └── SKILL.md
     ├── datasets/
-    │   └── tilebox-datasets/
-    │       └── SKILL.md
+    │   ├── tilebox-datasets/
+    │   │   └── SKILL.md
+    │   └── tilebox-ingesting-datasets/
+    │       ├── SKILL.md
+    │       └── reference/
     └── workflows/
         ├── tilebox-workflow-authoring/
         │   └── SKILL.md
