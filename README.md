@@ -164,6 +164,6 @@ tilebox-skills/
 ## Resources
 
 - [Tilebox Docs](https://docs.tilebox.com)
-- [Tilebox CLI repository](https://github.com/tilebox/cli)
+- [Tilebox CLI documentation](https://docs.tilebox.com/agents-and-ai-tools/tilebox-cli)
 - [Tilebox Go SDK](https://github.com/tilebox/tilebox-go)
 - [Agent Skills](https://agentskills.io/)
