@@ -62,6 +62,19 @@ Implement the recipe through the Python or Go reference. The converter validates
 
 Read `reference/validation.md`. Prove source, canonical, SDK, and Tilebox query-back behavior on bounded fixtures before enabling idempotent, observable bulk ingestion. For COGs, validate representative delivery routes for byte-range access when users need windowed reads. Tilebox has no STAC output interface, so compare reconstructed semantics rather than requiring a formal STAC export.
 
+## Write Documentation For Public Users
+
+Treat the dataset description as product documentation for people who want to discover and use the data, not as an ingestion report. Write it before handoff and publish it with `tilebox dataset update --description-file`.
+
+Keep it concise and practical:
+
+- explain the mission or source program, what the dataset contains, coverage or cadence caveats, and the license, citing authoritative source links;
+- list available asset families, what each contains, and which product a user should choose for common workflows;
+- state where the bytes live, whether credentials or requester-pays access are required, and which HTTPS, S3, or other locations are available; and
+- include a small example that queries one datapoint, decodes it with `AssetCollection.from_datapoint(...)`, and reads or downloads an asset through `tilebox.storage.aio` when the dataset supports the canonical Assets API.
+
+Do not expose converter mechanics, field-mapping decisions, deduplication rules, skipped helper records, normalization details, validation notes, or other implementation-only facts. Mention source-specific subsets or places only when they help users understand scientific content or coverage. Verify links, asset names, access requirements, and quantitative mission claims against live data and authoritative documentation.
+
 ## Suitability And Stop Conditions
 
 A source fits when its natural records are discrete scenes, acquisitions, observations, or products with stable identity, trustworthy time, meaningful boundaries, and useful catalog metadata. An analysis-ready Zarr or Icechunk cube is normally consumed directly; catalog an upstream acquisition inventory or genuine product records only when that serves a concrete need.

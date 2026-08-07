@@ -173,9 +173,14 @@ https://{bucket}.s3.{region}.amazonaws.com/{key}
 
 https://s3.{region}.amazonaws.com/{bucket}/{key}
   -> s3://{bucket}/{key}
+
+https://{bucket}.s3.amazonaws.com/{key}
+  -> s3://{bucket}/{key}
 ```
 
-Keep AWS region and bucket in Storage. R2 needs a custom-S3 scheme containing the account endpoint. Keep Azure Blob HTTPS unless configuration proves ADLS DFS/ABFS availability.
+The global virtual-hosted AWS endpoint is safe when the hostname is exactly `{bucket}.s3.amazonaws.com`; it identifies the same bucket and preserves the object-key bytes without requiring a region guess. Do not mistake S3 website, access-point, CDN, or custom-domain hosts for this endpoint.
+
+Keep a published AWS region in Storage, but do not invent one for the global endpoint. R2 needs a custom-S3 scheme containing the account endpoint. Keep Azure Blob HTTPS unless configuration proves ADLS DFS/ABFS availability.
 
 Do not generate alternates from:
 

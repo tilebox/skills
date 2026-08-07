@@ -27,7 +27,7 @@ Relevant docs concepts:
 - Dataset kinds add required fields automatically. Do not include required fields in the custom schema.
 - Custom field descriptions and example values power automatic schema documentation.
 - Existing fields cannot be removed or changed after data has been ingested. New fields can be added because fields are optional.
-- Empty datasets are the exception: if all collections are empty, the schema can be freely edited.
+- A dataset that has never contained data can be freely edited. Do not assume deleting previously ingested data restores this freedom; verify the live backend before planning a breaking update.
 
 ## Select A Dataset From The Target Product
 
@@ -100,11 +100,12 @@ Choose the dataset kind:
 Custom schema rules:
 
 - Field names must be `snake_case` and valid code identifiers.
-- Supported field types are `string`, `bytes`, `bool`, `int64`, `uint64`, `float64`, `Duration`, `Timestamp`, `UUID`, and `Geometry`.
+- Supported field types are `string`, `bytes`, `bool`, `int32`, `int64`, `uint64`, `float64`, `Duration`, `Timestamp`, `UUID`, and `Geometry`.
+- Default bounded integers such as raster dimensions, bits per sample, counts, and row/column indices to `int32`. Use `int64` only when the source domain can exceed the signed 32-bit range. ProtoJSON renders 64-bit integers as strings, while `int32` renders as JSON numbers.
 - Set `"queryable": true` on custom fields that should support server-side filtering.
 - Set `"repeated": true` for array fields.
 - Include `description` and `example_value` for every field whenever possible; this improves generated dataset documentation.
-- Treat reordering, renaming, removing, or changing field types as breaking unless the dataset is empty.
+- Treat reordering, renaming, removing, or changing field types as breaking once the dataset has ever contained data.
 
 Example `schema.json`:
 
@@ -206,6 +207,8 @@ Only safe when all collections are empty:
 - Rename fields.
 - Change field types or repeated-ness.
 - Change dataset code name.
+
+Treat those changes as permanently unavailable after first ingestion unless a live update proves otherwise. Some deployed backends retain ingestion history and reject breaking schema or code-name changes even after all datapoints and collections are deleted. Choose field widths before sample ingestion; if the backend rejects a breaking update on an empty dataset, create a replacement dataset with the corrected schema.
 
 Inspect collection counts before breaking changes:
 
