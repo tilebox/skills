@@ -126,6 +126,15 @@ For example, `/properties/view:azimuth` and `/properties/view_azimuth` both prop
 
 Choose types from the source schema and representative non-null values. Preserve integer/float semantics, stable repeated element types, typed structures, and explicit presence for zero, false, and empty values. Null or missing becomes unset; null-only fields remain omitted until their type is known. Reject incompatible shape changes.
 
+Choose integer widths deliberately before creating the dataset:
+
+- Default to `int32` when the source contract guarantees the value fits a signed 32-bit integer. Common examples include raster width/height or shape, bits per sample, band/count fields, row/column indices, and other bounded product dimensions.
+- Use `int64` only when the documented or observed domain can exceed the signed 32-bit range; do not select it merely because Python uses `int` or a source JSON Schema says `integer` without narrower bounds.
+- Use `uint64` only when unsigned 64-bit semantics are part of the source contract, not as a substitute for choosing an appropriate signed width.
+- Record the range evidence in the conversion recipe when the width is not obvious from the field's specification.
+
+This choice also affects command-line JSON. Standard ProtoJSON renders `int64` and `uint64` values as JSON strings to preserve precision, including repeated values, while `int32` values render as JSON numbers. Never change semantic meaning solely for presentation, but prefer `int32` for naturally bounded values so consumers do not receive avoidable stringified integers.
+
 Do not use JSON strings, arbitrary Structs, or `google.protobuf.Value` to force a mixed field into the schema.
 
 ## Queryable Fields
@@ -156,5 +165,7 @@ On non-empty datasets:
 - update descriptions and documentation deliberately;
 - never retype, rename, remove, reorder, or renumber existing fields; and
 - create a new dataset for incompatible wire changes.
+
+Treat field type choices as permanent once the first datapoint has been ingested. Do not rely on deleting datapoints or collections to make a later retype possible: deployed backends may retain ingestion history and reject the breaking update even when every current collection is empty. If a retype is rejected, create a replacement dataset with the corrected schema rather than restoring the old data and retrying.
 
 Inspect collection counts and the current schema before every update.

@@ -103,6 +103,8 @@ The converter must not recreate generated Asset/registry messages, compute href 
 
 The converter still owns source normalization. It must merge valid legacy `eo:bands` and `raster:bands` into semantic Bands, convert relative href paths to absolute hrefs, choose roles and alternates, and construct typed metadata before calling the compiler. Do not request every Asset while normalizing its href.
 
+Apply every lossless cloud-native alternate approved by the conversion recipe, even when the source publishes only an HTTPS location. In particular, map exact AWS virtual-hosted REST endpoints—including `https://{bucket}.s3.amazonaws.com/{key}`—to an `s3://{bucket}/{key}` alternate while preserving the HTTPS source as primary. Validate the hostname and reject query-bearing, website, CDN, access-point, or ambiguous URLs rather than applying a broad string replacement.
+
 ## Keep The Datapoint Flat
 
 Python ingestion accepts a flat mapping from dataset field names to scalar values, geometries, or generated protobuf messages:
