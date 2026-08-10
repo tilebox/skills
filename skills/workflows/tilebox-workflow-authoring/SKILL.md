@@ -43,6 +43,33 @@ Sketch the task graph:
 4. Choose task fields versus `context.job_cache` versus durable object/Zarr artifacts.
 5. Choose retry behavior for idempotent network/storage operations.
 
+### Structure Non-Trivial Workflows As Packages
+
+Treat the generated `runner.py` as a starting scaffold, not the default home for the entire implementation. A single file is acceptable for a genuinely small prototype with one or two short tasks and little processing logic. When the workflow has multiple stages or task types, substantial dataset/raster/encoding logic, reusable helpers, or independently testable processing logic, split it into an importable package with modules organized by coherent responsibility.
+
+Keep `runner.py` as a thin composition root: import every registered task, construct the `Runner`, and configure runner-level cache or logging. Do not put task execution methods, dataset queries, raster processing, scientific algorithms, or output encoding there. Name the module containing the root task and main fanout after the workflow capability, such as `rgb_timelapse.py`, rather than a generic `orchestration.py`. Group other related task classes by workflow stage or domain, use concrete stage names such as `aggregation.py`, and keep portable processing/IO functions separate from Tilebox orchestration when that makes them easier to test. Avoid both a catch-all `utils.py` and one module per tiny class; extract a module only when it has a clear role.
+
+A non-trivial timelapse workflow might use:
+
+```text
+runner.py                         # task registration and runner configuration only
+rgb_timelapse/
+  __init__.py
+  tasks/
+    __init__.py
+    rgb_timelapse.py              # root workflow task and fanout
+    frames.py                     # frame worker task
+    aggregation.py                # frame aggregation and encoding task
+  imagery.py                      # bounded reads, masking, and rendering
+  encoding.py                     # deterministic GIF encoding functions
+  models.py                       # shared typed values, only when needed
+tests/
+  test_imagery.py
+  test_encoding.py
+```
+
+Adapt the depth to the workflow: a smaller project can use `tasks.py`, `imagery.py`, and `runner.py` without a `tasks/` subpackage. Do not unit-test Tilebox task classes merely to assert submitted tasks, dependencies, progress, or logging; verify orchestration through release build/task discovery and a representative job's actual graph. Add focused tests only where useful for substantive underlying functions such as scene selection/grouping, transforms, masking, rendering, or encoding. Extract those functions from task execution methods so they can be tested without mocking `ExecutionContext`, but do not create trivial helpers solely to produce tests. Ensure every package module needed at runtime is included by the release build configuration, and verify imports from the built artifact rather than only from the working tree.
+
 ### Require Task-Level Parallelism
 
 Task-level fanout is a workflow design requirement, not an optional optimization. Whenever the requested output contains two or more independent units—such as scenes, seasonal or other time periods, AOIs, products, spatial chunks, or model tiles—represent those units as separate Tilebox tasks submitted with `context.submit_subtask(s)`. Infer this decomposition from the outcome; never require the user to name `submit_subtasks`, specify task counts, or prescribe a DAG. For example, a 12-scene timelapse that combines all frames requires a graph such as `1 root + 12 scene workers + 1 encoder`, not one task with a 12-iteration loop.
@@ -167,6 +194,7 @@ Declare runtime dependencies in `pyproject.toml`, run `uv sync`, and avoid edita
 5. High-fanout tasks have labels, useful progress, structured logs, and spans where warranted.
 6. Dependencies sync and task modules import in the intended environment.
 7. For scaffolded release projects, `tilebox workflow build-release --debug --json` succeeds after editing generated task code.
-8. Pure helpers have focused tests or type/import checks, or the smallest known job runs against a suitable runner.
-9. Earth observation outputs have representative scientific validation, coverage/alignment checks, provenance, and stated limitations.
-10. A representative job's actual task summaries match the planned root, fanout, and aggregation stages; progress counters or child spans are not treated as task fanout.
+8. Non-trivial workflows use coherent package modules and keep the runner entrypoint limited to registration and runner-level configuration.
+9. Substantive underlying processing functions have focused tests where useful; Tilebox task orchestration is verified through build/task discovery and a representative job rather than task-class unit tests.
+10. Earth observation outputs have representative scientific validation, coverage/alignment checks, provenance, and stated limitations.
+11. A representative job's actual task summaries match the planned root, fanout, and aggregation stages; progress counters or child spans are not treated as task fanout.
