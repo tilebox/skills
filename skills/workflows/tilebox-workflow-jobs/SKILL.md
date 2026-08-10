@@ -55,7 +55,7 @@ tilebox job submit \
 
 Important flags:
 
-- `--name`: required job name.
+- `--name`: required job name. This identifies one execution and may include useful run-specific context such as location, period, or cadence. Do not reuse an instance-specific job name as the workflow name or slug.
 - `--task`: required task identifier name.
 - `--version`: defaults to `v0.0`.
 - `--input`: inline JSON or plain text. Valid JSON passes through; non-JSON text becomes a JSON string.

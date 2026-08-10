@@ -15,7 +15,7 @@ Use this skill to initialize workflow projects, turn workflow code changes into 
 
 For routine iteration, do the smallest safe loop:
 
-1. For a new project, initialize once with `tilebox workflow init --json` or `tilebox workflow init --name "Scene QA" --json` before creating project files by hand.
+1. For a new project, choose a reusable capability name using the policy below, then initialize once with `tilebox workflow init --name "Scene QA" --json` before creating project files by hand. Omit `--name` only when the current directory already has an appropriate capability-based name.
 2. Edit workflow code and ensure changed files are covered by `[build].include` and not excluded.
 3. Optional local verification: `tilebox workflow build-release --debug --json`.
 4. Publish: `tilebox workflow publish-release --json`.
@@ -40,7 +40,29 @@ Apply these boundaries:
 - If authentication, a suitable cluster, or a runner is unavailable, finish and verify the local project where possible, then report the exact operational blocker. Do not claim a publish, deployment, or completed output that did not occur.
 - Use `tilebox-workflow-jobs` after deployment when the requested outcome is a map, animation, detection set, statistics, or another generated product.
 
-Before initializing, inspect project context. Reuse an existing `tilebox.workflow.toml`. Initialize an empty or clearly intended project root directly; when an unrelated repository occupies the root and the workflow should be standalone, use a clearly named subdirectory so generated workflow files do not overwrite or mix with unrelated project files.
+Before initializing, inspect project context. Reuse an existing `tilebox.workflow.toml`. Initialize an empty or clearly intended project root directly; when an unrelated repository occupies the root and the workflow should be standalone, use a capability-based subdirectory so generated workflow files do not overwrite or mix with unrelated project files.
+
+## Choose A Reusable Workflow Identity
+
+A workflow is a reusable program; a job is one instantiation of it. Name the workflow for behavior that remains true across every valid job, not for the concrete result requested in the first prompt. Use the same policy for a standalone project directory because `workflow init` derives the name from that directory when `--name` is omitted.
+
+Before initialization, identify the intended root-task inputs and defaults. Exclude from the workflow name:
+
+- concrete input values such as places, AOIs, coordinates, dates, durations, events, scene IDs, and scene counts;
+- labels for configurable choices such as `seasonal`, `monthly`, `sentinel-2`, `ndvi`, or `gif` when cadence, source, algorithm/product, or output format can be selected by job input; and
+- first-run or customer context that does not constrain what later jobs may submit.
+
+Keep a term only when it describes fixed workflow behavior or a true implementation boundary. Prefer concise capability names such as `rgb-timelapse`, `cloud-masked-composite`, or `sar-change-detection`. Apply this reuse test to every proposed word: **could another valid submission change this word without changing the workflow code?** If yes, omit it from the workflow name and slug. Put those details in root-task inputs and, when useful, the job name instead.
+
+For example, suppose the first run requests Vienna, the last three years, and one frame per season, while the root task accepts `aoi`, `start`, `end`, and `cadence`. Initialize the workflow as:
+
+```bash
+mkdir rgb-timelapse
+cd rgb-timelapse
+tilebox workflow init --name "RGB Timelapse" --json
+```
+
+Do not use `vienna-seasonal-timelapse`: `vienna` is an AOI value and `seasonal` is one cadence choice. If the implementation always groups imagery by season and exposes no cadence choice, `seasonal-rgb-timelapse` is appropriate because `seasonal` then describes fixed behavior.
 
 ## Initialize A Workflow Project
 
@@ -48,13 +70,15 @@ For a new Python workflow project, run `tilebox workflow init` before creating `
 
 `tilebox workflow init` creates the server-side workflow, writes the API-returned slug into `tilebox.workflow.toml`, scaffolds the local project files, adds the `tilebox` Python dependency, and runs `uv sync` so the project is ready for `build-release`, `publish-release`, `deploy-release`, job submission, and local release-runner testing.
 
+Initialization deliberately starts with a minimal `runner.py`. It is a scaffold, not a recommendation to keep all workflow code in one file. For non-trivial workflows, follow `tilebox-workflow-authoring` to move tasks and processing into coherent package modules while keeping the runner entrypoint limited to task registration and runner-level configuration. Update `[workflow].runner` if the entrypoint moves, and ensure `[build].include` contains the full package tree.
+
 `uv` is required on `PATH` for workflow initialization, release build/publish validation, and `tilebox runner start`. If `uv` is missing, fix the `uv` installation first, then rerun `tilebox workflow init`. Do not fall back to manual scaffolding just because `uv` is not initially available.
 
 ```bash
 tilebox workflow init --json
 ```
 
-Provide a project name when the directory name is not the name you want agents and users to see:
+Provide the reusable capability name explicitly when the directory name is not already the name you want agents and users to see:
 
 ```bash
 tilebox workflow init --name "Scene QA" --json
@@ -167,7 +191,7 @@ The build command:
 - starts the configured worker runtime and calls task discovery;
 - returns the content fingerprint, task identifiers, files, and artifact digest/path.
 
-If build fails, fix the config or runtime before publishing. Common fixes: include `pyproject.toml`, `uv.lock`, and `src/**`; exclude `.venv/**`; ensure the `runner` import path resolves from the extracted artifact. Fix any python import errors.
+If build fails, fix the config or runtime before publishing. Common fixes: include `pyproject.toml`, `uv.lock`, and the complete workflow package tree such as `src/**` or `scene_qa/**`; exclude `.venv/**`; ensure the `runner` import path resolves from the extracted artifact. Fix any python import errors.
 
 ## Keep Large Runtime Artifacts Out Of Releases
 
