@@ -105,6 +105,31 @@ class ProcessScene(Task):
 - Keep the complete serialized input at most 2048 bytes. Pass compact IDs, bounds, keys, and small config—not arrays, dataframes, xarray datasets, large geometry, manifests, credentials, or local paths.
 - Register every task class used by jobs with the runner.
 
+### Await Async IO Directly In Tasks
+
+Define `async def execute(self, context: ExecutionContext) -> None` whenever a task uses async APIs, including `tilebox.storage.aio`, async HTTP clients, or bounded concurrent requests. Await those APIs directly; never wrap them in `asyncio.run(...)`. The workflow executor awaits async `execute` methods while preserving normal failure, retry, tracing, and completion behavior.
+
+```python
+import asyncio
+
+from niquests import AsyncSession
+
+
+class FetchMetadata(Task):
+    urls: list[str]
+
+    async def execute(self, context: ExecutionContext) -> None:
+        async with AsyncSession() as client:
+            responses = await asyncio.gather(
+                *(client.get(url) for url in self.urls)
+            )
+        for response in responses:
+            response.raise_for_status()
+        context.logger.info("Metadata fetched", count=len(responses))
+```
+
+Choose client lifetime according to its event-loop behavior: create `niquests.AsyncSession` inside `execute`, while `tilebox.storage.aio.Client` may be reused across task executions. See `reference/tilebox/tasks-and-graphs.md` for details. Bound large request sets with a semaphore or bounded batches. Async concurrency is appropriate for multiple IO requests that belong to one task, such as the bands or byte ranges needed for one scene. It does not replace task-level fanout for independent scenes, AOIs, time periods, products, chunks, or model tiles. Keep `runner.run_all()` and `runner.run_forever()` in synchronous runner entrypoints rather than calling them from async code.
+
 ## Build Simple Dynamic Graphs
 
 ```python

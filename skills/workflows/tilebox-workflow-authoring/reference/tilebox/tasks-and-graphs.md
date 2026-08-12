@@ -27,6 +27,25 @@ class ProcessScene(Task):
 
 The complete serialized input for every root or submitted task is limited to **2048 bytes**, including all fields and values. Pass compact IDs, time windows, AOI bounds, chunk coordinates, small configuration, cache keys, and object prefixes. Do not pass arrays, large GeoJSON, manifests, dataframes, xarray datasets, binary data, thousands of URLs, credentials, or local paths. Store a large payload in job cache or durable storage and pass only its compact key. Prefer typed fields and defaults to unstructured dictionaries.
 
+## Synchronous And Asynchronous Execution
+
+`execute` may be synchronous or asynchronous. Use `async def execute(...) -> None` when the task awaits `tilebox.storage.aio`, an async HTTP client, or other async IO. Await calls directly instead of putting `asyncio.run(...)` inside a synchronous task; the workflow executor detects and awaits the result. Exceptions from async execution follow the same task failure and retry path as exceptions from synchronous execution.
+
+```python
+from niquests import AsyncSession
+
+
+class FetchMetadata(Task):
+    url: str
+
+    async def execute(self, context: ExecutionContext) -> None:
+        async with AsyncSession() as client:
+            response = await client.get(self.url)
+            response.raise_for_status()
+```
+
+Runner tasks execute sequentially, but each async `execute` call currently gets a fresh event loop. Sequential execution alone does not make arbitrary async clients reusable across tasks. In particular, construct and close `niquests.AsyncSession` within one `execute` call because its connections are tied to that loop. `tilebox.storage.aio.Client` may instead be cached at runner scope: it caches reusable obstore stores rather than an event-loop-bound session. Follow the documented lifetime of other clients. Use bounded async concurrency for related IO requests within one task, but represent independently schedulable workflow units as subtasks. `runner.run_all()` and `runner.run_forever()` remain synchronous entrypoints and must not be called from a running event loop.
+
 ## Subtasks, Dependencies, Optional Work, And Retries
 
 ```python
