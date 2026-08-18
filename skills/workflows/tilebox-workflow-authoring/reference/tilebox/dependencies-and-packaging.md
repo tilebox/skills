@@ -30,6 +30,31 @@ Instead publish the dependency to an index with a normal version constraint, mov
 
 Add only what is used. Typical choices are `obstore` for external object storage, `tilebox-storage` for asset-aware GeoTIFF reads, `zarr` for direct region writes, `xarray` for labeled Zarr/NetCDF reads, `odc-geo` for grid/reprojection work, `rasterio` for writing/warping and other GDAL formats, and `niquests` for non-storage HTTP. Follow the relevant storage, Zarr, and grid references instead of repeating their setup here.
 
+## Optional Task-Input Types
+
+Tilebox tasks support many common geospatial library values directly. Codec integrations load lazily so workflows that do not use those libraries stay small. Lazy loading does not install a package: declare every package imported by workflow source explicitly, even when another dependency happens to install it transitively.
+
+| Imported type | Runtime dependency | Useful for |
+| --- | --- | --- |
+| `odc.geo.*` | `odc-geo>=0.5` with no upper bound | CRS-aware geometry, grids, and tiling |
+| `shapely.*` | `shapely>=2` | Geometry without an associated CRS |
+| `pyproj.CRS` | `pyproj>=3.4` | CRS parsing and transformations |
+| `affine.Affine` | `affine>=2` | Raster grid transforms |
+| `rasterio.windows.Window` | `rasterio` | Rasterio window reads and writes |
+| `async_geotiff.Window` | `async-geotiff` | Async GeoTIFF window reads |
+
+For example, source that imports ODC Geo and Shapely should declare both:
+
+```toml
+dependencies = [
+  "tilebox>=0.59",
+  "odc-geo>=0.5",
+  "shapely>=2",
+]
+```
+
+After changing task field types or dependencies, run `uv sync` and import every task module in the synchronized environment. Release build validation must discover the same modules successfully.
+
 ## PyTorch And Architecture-Specific Wheels
 
 Use explicit uv indexes and platform markers matching intended CPU/GPU runners:

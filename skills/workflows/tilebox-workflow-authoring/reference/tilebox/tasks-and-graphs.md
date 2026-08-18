@@ -25,7 +25,64 @@ class ProcessScene(Task):
 - A runner at `v1.5` can execute a task submitted at `v1.3`, but not the reverse. Keep the major version for compatible fixes and bump it for breaking input or behavior changes.
 - Every task used by a submitted job must be registered with the runner, and submitter/runner identifiers must agree.
 
-The complete serialized input for every root or submitted task is limited to **2048 bytes**, including all fields and values. Pass compact IDs, time windows, AOI bounds, chunk coordinates, small configuration, cache keys, and object prefixes. Do not pass arrays, large GeoJSON, manifests, dataframes, xarray datasets, binary data, thousands of URLs, credentials, or local paths. Store a large payload in job cache or durable storage and pass only its compact key. Prefer typed fields and defaults to unstructured dictionaries.
+The complete serialized input for every root or submitted task is limited to **2048 bytes**, including all fields and values. Pass compact values, IDs, small configuration, cache keys, and object prefixes. Do not pass arrays, large GeoJSON, manifests, dataframes, xarray datasets, large binary payloads, thousands of URLs, credentials, clients, open files, or local paths. Put compact job-scoped bytes such as metadata or reduction summaries in `context.job_cache`; put large or durable payloads in object storage or Zarr and pass only a compact key. See [state and artifacts](state-and-artifacts.md). Prefer typed fields and defaults to unstructured dictionaries.
+
+## Choose Native Value Types Before Custom Shapes
+
+Use the simplest idiomatic type that completely expresses the field. Before defining a representation, check whether Python, Tilebox, or the processing library already provides that value type. Do not recreate an established type as a custom dataclass, named tuple, or ad hoc positional tuple/list/dictionary merely to make it serializable. A plain container is still right when it is the conventional Python model for the concept; for example, use `tuple[datetime, datetime]` for an ordinary time range.
+
+Task serialization supports these values directly; no registration or manual conversion is needed:
+
+| Category | Supported values and when to use them |
+| --- | --- |
+| Plain Python | Primitives, typed containers, unions, optional values, enums, nested dataclasses, `datetime`, `date`, `time`, `timedelta`, `UUID`, `Decimal`, `bytes`, `Path`/`PurePath`, and `ZoneInfo`. Use these for generic concepts, while remembering that a machine-local path is not a portable task input. |
+| Tilebox query values | `TimeInterval`, `IDInterval`, and `SpatialFilter`. Use them when their query behavior or explicit endpoint/filter semantics matter; they are not required replacements for ordinary Python ranges and geometry. |
+| Shapely | Geometry subclasses such as points, lines, polygons, multi-geometries, and collections. Use for geometry without an associated CRS. |
+| ODC Geo | `Geometry`, `BoundingBox`, `CRS`, `GeoBox`, `GeoboxTiles`, `Index2d`, `Shape2d`, `Resolution`, `XY`, and `AnchorEnum`. Use these directly for CRS-aware geometry, grids, and tiling rather than recreating their structure. |
+| pyproj and affine | `pyproj.CRS` and `affine.Affine`. Use them when they are the native values of the processing code. |
+| Raster windows | `rasterio.windows.Window` and `async_geotiff.Window`. Use the type consumed by the raster API instead of wrapping its offsets and shape in another input model. |
+| Protobuf | `google.protobuf.message.Message` subclasses, including nested messages. Use them when the surrounding API already exposes protobuf values. |
+
+For example, ordinary Python time and Shapely geometry remain natural root inputs, while ODC's own types describe an ODC tiling plan without a parallel custom model:
+
+```python
+from datetime import datetime
+
+from odc.geo import Index2d
+from odc.geo.geobox import GeoboxTiles
+from shapely import Geometry
+from tilebox.workflows import ExecutionContext, Task
+
+
+class BuildMosaic(Task):
+    time_range: tuple[datetime, datetime]
+    aoi: Geometry
+
+
+class ProcessTile(Task):
+    tiles: GeoboxTiles
+    tile_index: Index2d
+
+    def execute(self, context: ExecutionContext) -> None:
+        tile = self.tiles[self.tile_index]
+        output_region = self.tiles.roi[self.tile_index]
+        # Read, process, and write this tile.
+```
+
+Likewise, pass the window implementation used by the raster API instead of copying its four values into another shape:
+
+```python
+from async_geotiff import Window
+
+
+class ReadRasterTile(Task):
+    asset_key: str
+    window: Window
+```
+
+Use timezone-aware datetimes. Use `odc.geo.Geometry` when the CRS must travel with the geometry. Use Tilebox `TimeInterval` when start/end inclusivity is explicit or the object itself is useful to a dataset query. A custom dataclass remains appropriate for a real workflow-specific concept that combines or adds semantics to existing values; it should not merely rename the fields of one supported type.
+
+Codec integrations are lazy. The workflow must still declare every optional package it imports; see [dependencies and packaging](dependencies-and-packaging.md). Serialization support also does not make large or stateful values suitable task inputs.
 
 ## Synchronous And Asynchronous Execution
 

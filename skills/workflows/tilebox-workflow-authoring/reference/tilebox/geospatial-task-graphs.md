@@ -4,6 +4,8 @@ Choose the outer fanout axis first: scene/granule, product/band, AOI, time windo
 
 Distinguish task scheduling units from raster windows, GeoTIFF blocks, web tiles, Zarr chunks, and array-library chunks. Align them when useful, but do not conflate them.
 
+When a task input is an ODC tiling plan, use `GeoboxTiles` with `Index2d`; when it is a Rasterio or async-geotiff read window, use that library's `Window`. Do not create parallel dataclass or tuple/dictionary representations solely for task serialization.
+
 Keep bounded read, masking, calibration, reprojection, and matching analysis in one task when they share a natural axis and fit memory. Add an external intermediate only for a cross-task rendezvous, rechunk, different fanout axis, or working set that cannot remain local.
 
 Chunk sizing should amortize scheduling/open costs, fit all temporary arrays in memory, match model input where fixed, and align with Zarr/output blocks when practical. Use halos for neighborhood operations and crop before writing.
