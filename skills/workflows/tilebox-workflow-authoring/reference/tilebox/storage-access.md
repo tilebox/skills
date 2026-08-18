@@ -1,6 +1,6 @@
 # Tilebox Storage Access
 
-Use the async asset API from `tilebox.storage.aio`. `Client.resolve(asset)` is synchronous and network-free; reads are async. Resolution chooses a compatible declared location, configures anonymous access when no authentication is referenced, and reuses stores with the same policy. Do not probe locations or pass removed per-call `alternate`, `storage_scheme`, or `authentication_scheme` arguments.
+Use the async asset API from `tilebox.storage.aio`. `Client.resolve(asset)` is synchronous and network-free; reads are async. Resolution chooses a compatible declared location, configures anonymous access when no authentication is referenced, and reuses stores with the same policy. A client may be reused across task executions, including when each execution has a different event loop, so runner-level caching can preserve its store cache. Do not probe locations or pass removed per-call `alternate`, `storage_scheme`, or `authentication_scheme` arguments.
 
 ```python
 from tilebox.storage.aio import Client
@@ -14,7 +14,7 @@ path = await storage.download(asset, destination, overwrite=False)
 geotiff = await storage.open_geotiff(asset)  # Opens; does not read pixels.
 ```
 
-Equivalent module functions are available from `tilebox.storage.aio`. `iter_bytes(...)` returns an async iterator and is consumed with `async for`, not `await`. Reuse one client so resolved stores and connections are reused.
+Equivalent module functions are available from `tilebox.storage.aio`. `iter_bytes(...)` returns an async iterator and is consumed with `async for`, not `await`. Reuse one client where practical so resolved stores are reused.
 
 Use `AssetAccessPolicy` at client construction only when location-scheme preference must be constrained:
 
@@ -40,6 +40,6 @@ window = window_from_bounds(
 chunk = await geotiff.read(window=window)
 ```
 
-The CRS describes the supplied bounds. The API does not apply scale/offset, masks, alignment, reprojection, or resampling. Bound concurrency with a semaphore or bounded batches; do not open thousands of assets at once.
+The CRS describes the supplied bounds. The API does not apply scale/offset, masks, alignment, reprojection, or resampling. Use `asyncio.gather` for a small fixed set of related reads and bound larger request sets with a semaphore or bounded batches; do not open thousands of assets at once. This request-level concurrency belongs inside one async task only when the requests jointly implement that task's indivisible unit. Use Tilebox subtasks instead for independent scenes, AOIs, periods, products, chunks, or tiles.
 
 Public source access does not provide output storage. Legacy `open_data.copernicus.*` products are a temporary exception: when their datapoints are not asset-compatible, use the deprecated `CopernicusStorageClient` path documented by `tilebox-datasets`; keep credentials in the runtime environment and validate one product before fanout.

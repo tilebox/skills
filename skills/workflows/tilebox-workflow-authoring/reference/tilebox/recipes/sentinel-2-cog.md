@@ -2,7 +2,7 @@
 
 Use `tilebox-datasets` to confirm the source and live schema. The established default for ordinary public L2A COG work is the AWS Earth Search-backed source; this recipe assumes one already-selected datapoint with semantic assets.
 
-RGB is typically 10 m while SCL is typically 20 m. Build a bounded window on each grid, read concurrently, and reproject SCL to the RGB window/grid with nearest-neighbor resampling:
+RGB is typically 10 m while SCL is typically 20 m. Build a bounded window on each grid, read the bands concurrently, and reproject SCL to the RGB window/grid with nearest-neighbor resampling:
 
 ```python
 import asyncio
