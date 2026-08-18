@@ -68,7 +68,7 @@ Do not use `vienna-seasonal-timelapse`: `vienna` is an AOI value and `seasonal` 
 
 For a new Python workflow project, run `tilebox workflow init` before creating `pyproject.toml`, `tilebox.workflow.toml`, `runner.py`, source packages, or tests. Do not hand-write the initial workflow project scaffold.
 
-`tilebox workflow init` creates the server-side workflow, writes the API-returned slug into `tilebox.workflow.toml`, scaffolds the local project files, adds the `tilebox` Python dependency, and runs `uv sync` so the project is ready for `build-release`, `publish-release`, `deploy-release`, job submission, and local release-runner testing.
+`tilebox workflow init` creates the server-side workflow, writes the API-returned slug into `tilebox.workflow.toml`, scaffolds the local project files, adds the `tilebox` Python dependency, and runs `uv sync` so the project is ready for `build-release`, `publish-release`, `deploy-release`, job submission, and local release-runner testing. It does not add task-specific optional libraries such as ODC Geo, Shapely, Rasterio, or async-geotiff; declare every package imported by authored workflow code and rerun `uv sync`.
 
 Initialization deliberately starts with a minimal `runner.py`. It is a scaffold, not a recommendation to keep all workflow code in one file. For non-trivial workflows, follow `tilebox-workflow-authoring` to move tasks and processing into coherent package modules while keeping the runner entrypoint limited to task registration and runner-level configuration. Update `[workflow].runner` if the entrypoint moves, and ensure `[build].include` contains the full package tree.
 

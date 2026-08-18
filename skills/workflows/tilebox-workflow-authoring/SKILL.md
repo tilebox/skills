@@ -84,6 +84,8 @@ Read `reference/tilebox/tasks-and-graphs.md` for core task semantics, `reference
 
 `Task` applies dataclass behavior; fields are serialized inputs.
 
+Use the simplest idiomatic type that expresses each field. Before inventing a representation, check whether Python, Tilebox, or the processing library already provides the value type. Do not recreate an established type as a custom dataclass, named tuple, or ad hoc tuple/list/dictionary shape merely to make it serializable. Ordinary containers remain appropriate when they are the natural Python shape, such as `tuple[datetime, datetime]` for a time range. Read `reference/tilebox/tasks-and-graphs.md` for supported types and examples.
+
 ```python
 from tilebox.workflows import ExecutionContext, Task
 
@@ -102,7 +104,7 @@ class ProcessScene(Task):
 
 - Default `v0.0` identifiers are acceptable for prototypes. Stable identifiers return `(name, vX.Y)`.
 - Minor versions are forward-compatible; bump major for breaking input/behavior changes.
-- Keep the complete serialized input at most 2048 bytes. Pass compact IDs, bounds, keys, and small config—not arrays, dataframes, xarray datasets, large geometry, manifests, credentials, or local paths.
+- Keep the complete serialized input at most 2048 bytes. Pass compact plain-Python or supported library values, IDs, keys, and small configuration—not arrays, dataframes, xarray datasets, large geometry, manifests, credentials, clients, open files, or local paths. Use `context.job_cache` or durable storage according to `reference/tilebox/state-and-artifacts.md`.
 - Register every task class used by jobs with the runner.
 
 ### Await Async IO Directly In Tasks
@@ -166,7 +168,7 @@ Do not reconstruct provider paths, repeat storage API snippets, or embed source/
 
 ## Dependencies And Operations
 
-Declare runtime dependencies in `pyproject.toml`, run `uv sync`, and avoid editable/local-path dependencies; see `reference/tilebox/dependencies-and-packaging.md`. Use authoring for source and focused local checks only. Use `tilebox-workflow-releases` for init/build/deploy and `tilebox-workflow-jobs` for submission/wait/clusters.
+Declare runtime dependencies in `pyproject.toml`, including optional libraries whose types appear in task fields. Tilebox loads their serializers lazily but does not install those libraries. Run `uv sync`, avoid editable/local-path dependencies, and see `reference/tilebox/dependencies-and-packaging.md`. Use authoring for source and focused local checks only. Use `tilebox-workflow-releases` for init/build/deploy and `tilebox-workflow-jobs` for submission/wait/clusters.
 
 ## Reference Routing
 
@@ -174,7 +176,7 @@ Declare runtime dependencies in `pyproject.toml`, run `uv sync`, and avoid edita
 
 | Reference | Use when |
 | --- | --- |
-| `reference/tilebox/tasks-and-graphs.md` | Defining/versioning tasks, respecting input limits, submitting dependencies, retries, progress, observability, registration, and runner modes. |
+| `reference/tilebox/tasks-and-graphs.md` | Defining/versioning tasks, selecting supported input types, respecting input limits, submitting dependencies, retries, progress, observability, registration, and runner modes. |
 | `reference/tilebox/datasets-and-datapoints.md` | Querying an already-selected dataset, inspecting samples, selecting exactly one datapoint, or iterating datapoints. |
 | `reference/tilebox/assets.md` | Decoding `AssetCollection`, semantic keys, raster metadata, scale/offset, or explicit overrides. |
 | `reference/tilebox/storage-access.md` | Resolving/reading/streaming/downloading/opening Tilebox assets, access policy, anonymous access, windows, or concurrency. |
@@ -213,13 +215,14 @@ Declare runtime dependencies in `pyproject.toml`, run `uv sync`, and avoid edita
 ## Verification Checklist
 
 1. All submitted tasks are registered and identifiers/versions agree.
-2. Every serialized task input is at most 2048 bytes.
-3. Cross-task data uses the right state/artifact boundary and deterministic keys.
-4. Retryable execution is re-entrant and input-compatible.
-5. High-fanout tasks have labels, useful progress, structured logs, and spans where warranted.
-6. Dependencies sync and task modules import in the intended environment.
-7. For scaffolded release projects, `tilebox workflow build-release --debug --json` succeeds after editing generated task code.
-8. Non-trivial workflows use coherent package modules and keep the runner entrypoint limited to registration and runner-level configuration.
-9. Substantive underlying processing functions have focused tests where useful; Tilebox task orchestration is verified through build/task discovery and a representative job rather than task-class unit tests.
-10. Earth observation outputs have representative scientific validation, coverage/alignment checks, provenance, and stated limitations.
-11. A representative job's actual task summaries match the planned root, fanout, and aggregation stages; progress counters or child spans are not treated as task fanout.
+2. Task fields use idiomatic Python or existing library value types rather than structurally duplicating them in custom dataclasses or ad hoc containers.
+3. Every serialized task input is at most 2048 bytes.
+4. Cross-task data uses the right state/artifact boundary and deterministic keys.
+5. Retryable execution is re-entrant and input-compatible.
+6. High-fanout tasks have labels, useful progress, structured logs, and spans where warranted.
+7. Dependencies sync and task modules import in the intended environment.
+8. For scaffolded release projects, `tilebox workflow build-release --debug --json` succeeds after editing generated task code.
+9. Non-trivial workflows use coherent package modules and keep the runner entrypoint limited to registration and runner-level configuration.
+10. Substantive underlying processing functions have focused tests where useful; Tilebox task orchestration is verified through build/task discovery and a representative job rather than task-class unit tests.
+11. Earth observation outputs have representative scientific validation, coverage/alignment checks, provenance, and stated limitations.
+12. A representative job's actual task summaries match the planned root, fanout, and aggregation stages; progress counters or child spans are not treated as task fanout.

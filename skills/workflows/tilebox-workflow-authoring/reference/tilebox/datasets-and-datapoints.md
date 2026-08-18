@@ -4,7 +4,7 @@ Source recommendation, exact dataset slugs, collection selection, provider crede
 
 ```python
 from tilebox.datasets import Client
-from tilebox.datasets.data import TimeInterval
+from tilebox.datasets.query import TimeInterval
 
 dataset = Client().dataset(dataset_slug)
 data = dataset.query(
