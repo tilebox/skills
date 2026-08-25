@@ -10,7 +10,7 @@ The sampled STAC Item contains empty Asset hrefs. Tilebox requires a concrete pr
 
 The converter must never make storage, list-object, HEAD, or range requests. If metadata does not establish a clear layout, ask the user how to proceed. Offer a small bounded discovery probe only with permission, record its result in the recipe, and keep it out of per-Item conversion.
 
-Preserve typed SAR/Satellite scope, normalize deprecated `sar:product_type` into the open Product value, and use the exact CPHD media type `application/vnd.cphd` when applicable rather than `application/octet-stream`.
+Preserve typed SAR/Satellite scope, flatten Item fields with their exact `sar_` and `sat_` prefixes, normalize deprecated `sar:product_type` into the open Product value, and use the exact CPHD media type `application/vnd.cphd` when applicable rather than `application/octet-stream`.
 
 ## Capella: Cross-Directory Assets
 

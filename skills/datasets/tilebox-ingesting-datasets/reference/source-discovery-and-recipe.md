@@ -102,9 +102,11 @@ Prefer canonical routing when source collections differ only by time or alternat
 
 ## Infer Fields And Types
 
-Use source specifications and non-null representative values to infer exact scalar, repeated, and message types. Null values do not establish type; neither do empty arrays. Require stable element/object shapes and use well-known messages where available. Stop on incompatible shapes rather than stringifying conflicts or selecting the first observation.
+For standard STAC properties, identify both the source extension version and the current stable canonical version. Inventory deprecations and replacements before proposing fields. Use the modern target JSON Schema as the authoritative source for scalar, repeated, and enum types; do not use README field tables or observed JSON to override it. Use the source schema to interpret legacy input, and use representative non-null values to verify conformance, integer ranges, and source defects. Null values do not establish type; neither do empty arrays. Require stable element/object shapes and use only the dedicated messages permitted by `stac-protobuf-mapping.md`. Stop on incompatible shapes rather than stringifying conflicts or selecting the first observation.
 
-Use canonical STAC 1.1 JSON paths for schema mapping even when the source is older STAC or non-STAC. Record original source paths separately.
+Inventory decimal JSON strings that may be semantically numeric across representative records and variants. Convert them to the narrowest valid Tilebox integer only when documentation or consistent evidence establishes integer semantics; retain digit-only identifiers and codes as strings. Record accepted ranges and reject non-decimal or out-of-range values.
+
+Use modern canonical STAC 1.1 JSON paths for schema mapping even when the source is older STAC or non-STAC. Record original source paths separately. Do not mirror deprecated properties into the Tilebox schema when a canonical replacement exists; document whether each legacy property is transformed, split, used only for validation, or omitted as redundant.
 
 ## Encode Source Normalization Without Guessing
 
@@ -160,6 +162,7 @@ schema:
       repeated: false
       canonical_pointer: </properties/...>
       source_paths: [<raw provider paths>]
+      schema_evidence: <extension JSON Schema ref/version or provider contract>
       queryable: false
       roles: []
       normalization: <rule>

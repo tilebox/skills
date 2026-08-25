@@ -1,6 +1,6 @@
 # Canonical STAC 1.1 Normalization
 
-Normalize every accepted source to STAC 1.1 semantics before mapping it into Tilebox fields. This applies to valid older STAC, mixed-generation provider records, and non-STAC adapters. Semantic preservation is the goal; byte-identical source JSON is not.
+Normalize every accepted source to STAC 1.1 and current stable extension semantics before mapping it into Tilebox fields. This applies to valid older STAC, mixed-generation provider records, and non-STAC adapters. Produce a clean modern canonical model rather than mirroring source fields. Semantic preservation is the goal; byte-identical source JSON is not.
 
 ## Normalization Order
 
@@ -15,6 +15,12 @@ For each record:
 7. Pass semantic assets through the language-specific compilation path.
 
 Keep raw source paths and normalization rules in the conversion recipe. Dataset field annotations identify canonical output paths, not provider provenance.
+
+## Modernize Deprecated Extension Properties
+
+Inspect the current stable JSON Schema and deprecation guidance for every extension used by the source. Translate deprecated properties to their modern canonical equivalents before schema design. Field names, types, examples, and `source_json_pointer` annotations describe the normalized target property; legacy input paths belong only in the recipe and source parser.
+
+Do not retain a deprecated field merely because the source publishes it. When modern semantics split one legacy value into multiple properties, emit every defensible modern property. When a legacy value is replaced by richer canonical metadata, use it only for validation and omit the redundant field. If no lossless or evidence-backed mapping exists, stop rather than copying stale semantics into the Tilebox schema.
 
 ## Core Item Fields
 
@@ -74,7 +80,7 @@ Use the current generated `datasets.stac.v1` messages as the source of truth for
 
 ### EO
 
-- Keep `eo:cloud_cover` and `eo:snow_cover` as Item properties and generated top-level fields.
+- Keep `eo:cloud_cover` and `eo:snow_cover` as Item properties and generated top-level fields named `cloud_cover` and `snow_cover`; these are the only EO fields that drop the `eo_` prefix. Keep their canonical source pointers namespaced.
 - Keep common name, wavelength, width, and solar illumination on Bands.
 - EO common names are closed. Reject unknown values rather than inventing enum values.
 - Hyperspectral bands may omit common names; preserve wavelengths and descriptions.
@@ -111,13 +117,29 @@ Map supported simple class fields directly. Packed classification bitfields need
 
 - Use closed SAR enums for frequency band, polarization, and observation direction.
 - Keep open instrument mode and product type strings as strings.
-- Normalize deprecated `sar:product_type` into Product semantics.
+- Normalize deprecated `sar:product_type` into `product:type` semantics, but expose the canonical Item property as a generated field rather than a ProductProperties container.
 - Preserve different C/Ku or other frequency values on their individual Bands.
 - Keep Satellite orbit category separate from timestamped orbit state vectors.
 - Keep Product acquisition type as its closed enum; product type and timeliness category remain open strings.
 - Map `processing:software` as one typed software/version map, not one generated field per dynamic software name.
+- Normalize provider properties named `processing_level`, `processingLevel`, or equivalent into the canonical `processing:level` property. Map source values to the STAC Processing extension's suggested levels from product semantics and authoritative provider documentation; do not merely prepend `L` or copy an ambiguous code. Define each accepted mapping in the source/version recipe and reject unknown values. For example, a Sentinel-1 GRD source level `"1"` becomes `"L1"`, not `"L0"`.
+
+At Item scope, expose SAR, Satellite, Product, and other extension properties as individual namespace-preserving generated fields. Do not use their property-group protobuf messages as top-level dataset fields, and add only properties the collection actually publishes. This does not change Asset/Band scope: nested values remain attached to the Asset or Band that owns them.
 
 Do not reinterpret altimetry-specific properties as SAR merely because both mention bands or instrument modes.
+
+#### Sentinel-1 Legacy Extension Example
+
+For Items using deprecated Sentinel-1 extension fields, apply these source-specific modernizations when discovery confirms the same semantics:
+
+- `s1:processing_level` value `"1"` becomes `processing_level = "L1"` at `/properties/processing:level`.
+- `s1:processing_datetime` becomes a Timestamp field `processing_datetime` at `/properties/processing:datetime`.
+- `s1:product_timeliness` categories map to modern Product fields: `NRT-10m`, `NRT-1h`, `NRT-3h`, and `Fast-24h` become `product_timeliness` Durations of 10 minutes, 1 hour, 3 hours, and 24 hours plus the original value in `product_timeliness_category`, at `/properties/product:timeliness` and `/properties/product:timeliness_category`. `Off-line` and `Reprocessing` do not establish an acquisition-to-availability duration, so emit neither field. Reject unknown categories.
+- Omit `s1:resolution` when canonical `sar:resolution_range` and `sar:resolution_azimuth` preserve the resolution semantics.
+- Keep `s1:product_identifier` internal when it only validates Asset paths; do not create a dataset field for converter bookkeeping.
+- Do not store `s1:shape`; when present, use it only as a consistency check against canonical `proj:shape`.
+
+Retain non-deprecated source-specific properties with no modern replacement as flat fields with the source prefix removed and the original canonical source pointer retained. For Sentinel-1 these include `instrument_configuration_id`, `datatake_id`, `orbit_source`, `slice_number`, and `total_slices` from their `s1:*` properties. Item-level `proj:epsg`, `proj:bbox`, `proj:shape`, and `proj:transform` belong on each measurement Asset's Projection metadata when they describe those Assets; do not duplicate them as datapoint fields.
 
 ### Storage And Authentication
 
