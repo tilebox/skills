@@ -10,6 +10,8 @@ Turn every discovery-matrix dimension and normalization rule into a small record
 
 Assert the recipe's source versions, required fields, shapes, units, Band alignment, href bases/resolvers, XML/API versions, and file-tree grouping before normalization.
 
+For extension properties, validate legacy input against its source schema before normalization. For decimal strings normalized to integers, cover zero, representative bounds, non-decimal input, and overflow. For deprecated closed values such as processing levels or timeliness categories, test every accepted source value and reject a nearby unknown value rather than inventing a canonical mapping.
+
 Test that an unexpected future source shape fails with record ID, source path, and actionable evidence. Do not silently accept a provider change.
 
 For every source-specific normalization rule, test both the exact accepted condition and a nearby unexpected condition that must still fail.
@@ -17,6 +19,8 @@ For every source-specific normalization rule, test both the exact accepted condi
 ## Layer 2 — Canonical Semantics
 
 Compare the normalized record with the recipe's canonical semantic model. Focus on identity/time/geometry, legacy Band merge and order, nested scope, exact Links and alternates, open values, and rejection of unsupported nested metadata.
+
+Assert extension output types against the modern target JSON Schema, especially where README tables or observed encodings disagree. For every deprecated source property, assert the modern canonical value and pointer and the absence of a mirrored legacy schema field. When a legacy field is redundant, test its consistency check and prove it is not emitted.
 
 Validate the canonical model semantically. Do not require a formal STAC export from Tilebox; Tilebox does not currently expose a STAC output interface.
 

@@ -96,7 +96,7 @@ tilebox dataset get <dataset-slug> --json
 
 ## Canonical Source JSON Pointers
 
-`source_json_pointer` is an RFC 6901 pointer to the field's position in the normalized STAC 1.1 semantic model. It is not a pointer into raw provider XML, legacy extension JSON, or an API response.
+`source_json_pointer` is an RFC 6901 pointer to the field's position in the normalized modern STAC 1.1 semantic model. It is not a pointer into raw provider XML, a deprecated extension property, legacy extension JSON, or an API response. When a converter modernizes a legacy property, annotate the field with the modern canonical pointer and record the legacy input path separately in the recipe.
 
 Examples:
 
@@ -116,7 +116,11 @@ Describe final meaning, units, ranges, and representation. Keep provider defects
 
 ## Readable Field Names
 
-Remove the leading `properties` segment, retain namespaces that carry meaning, join nested segments with underscores, and normalize invalid characters to lowercase snake case. A source-specific namespace may be dropped only when the dataset context makes the name unambiguous, such as `eo:cloud_cover` to `cloud_cover` in a Sentinel-2-only dataset.
+Remove the leading `properties` segment, join nested segments with underscores, and normalize invalid characters to lowercase snake case. Preserve standard STAC extension prefixes exactly as published instead of expanding them: for example, `proj:code` becomes `proj_code` and `sat:orbit_state` becomes `sat_orbit_state`. Name fields by the extension that owns the property, not by the dataset's application domain.
+
+The only standard-extension naming exceptions are `eo:cloud_cover` to `cloud_cover` and `eo:snow_cover` to `snow_cover`. These frequently queried Item fields stay concise; every other EO property retains the `eo_` prefix. Their `source_json_pointer` values remain `/properties/eo:cloud_cover` and `/properties/eo:snow_cover`.
+
+Only a provider- or source-specific namespace may be dropped when the dataset context leaves the result unambiguous. For example, `umbra:collect_id` may become `collect_id` and `s1:slice_number` may become `slice_number`. Never drop a standard namespace merely because the dataset uses only one extension. The canonical `source_json_pointer` always retains the namespace, including a dropped provider prefix.
 
 Compare names against every generated, required, dedicated, and reserved field. Stop on collisions; never append hashes, numbers, or order-dependent suffixes automatically.
 
@@ -124,7 +128,7 @@ For example, `/properties/view:azimuth` and `/properties/view_azimuth` both prop
 
 ## Type And Shape Rules
 
-Choose types from the source schema and representative non-null values. Preserve integer/float semantics, stable repeated element types, typed structures, and explicit presence for zero, false, and empty values. Null or missing becomes unset; null-only fields remain omitted until their type is known. Reject incompatible shape changes.
+For a standard STAC extension property, use the JSON Schema for the modern canonical extension version as the authoritative target type contract. Use older schemas only to interpret legacy input before normalization. Do not substitute an extension README's field table or infer a different type only because sampled records happen to use one representation. Use representative non-null values to verify conformance, presence, width, and source defects. JSON Schema `number` normally maps to `float64`; `integer` maps to an integer type selected by the range rules below; closed strings map to an available Tilebox STAC enum; open strings remain strings. Preserve stable repeated element types and explicit presence for zero, false, and empty values. Null or missing becomes unset; null-only non-standard fields remain omitted until their type is known. Reject incompatible shape changes.
 
 Choose integer widths deliberately before creating the dataset:
 
@@ -135,7 +139,17 @@ Choose integer widths deliberately before creating the dataset:
 
 This choice also affects command-line JSON. Standard ProtoJSON renders `int64` and `uint64` values as JSON strings to preserve precision, including repeated values, while `int32` values render as JSON numbers. Never change semantic meaning solely for presentation, but prefer `int32` for naturally bounded values so consumers do not receive avoidable stringified integers.
 
+Some providers serialize semantically numeric integer properties as decimal JSON strings, including values they consider 64-bit. Normalize those values back to a Tilebox integer rather than preserving the transport representation as `string`. Choose `int32`, `int64`, or `uint64` from the documented and observed domain, not from the fact that the JSON token was quoted. Record the evidence and parsing rule in the recipe, and reject non-decimal or out-of-range values. Do not apply this rule to identifiers or codes whose canonical semantics are strings merely because they contain digits.
+
 Do not use JSON strings, arbitrary Structs, or `google.protobuf.Value` to force a mixed field into the schema.
+
+## STAC Message Boundaries
+
+At dataset field scope, use STAC-specific structured messages only for `Assets`, `Links`, repeated `Provider`, `ProcessingSoftware`, `Storage`, and `Authentication`. Geometry remains the required Tilebox spatial field. STAC enum types may be used for individual generated fields.
+
+Do not use Item-level extension property-group messages such as `SARProperties`, `SatelliteProperties`, `ProductProperties`, or analogous convenience containers as dataset fields. Flatten each property the collection actually publishes into its own namespace-preserving generated field, with the type defined by the extension JSON Schema. Do not exhaustively add every property offered by an extension when the source does not publish it.
+
+This rule does not authorize flattening nested metadata. Asset- and Band-scoped values stay associated with their Asset or Band and use the supported nested messages there; unsupported nested metadata follows the stop conditions below.
 
 ## Queryable Fields
 
@@ -151,7 +165,7 @@ Assign `primary_title` to at most one stable human-readable identity field. Thum
 
 ## Item-Level Versus Nested Metadata
 
-Item-level extension properties become generated fields unless a dedicated registry/message applies. Asset/Band values remain inside Assets/Bands; Link access values remain on Links and their registries; Storage and Authentication remain dedicated messages.
+Item-level extension properties become generated fields unless they are one of the dedicated STAC structures listed above. Asset/Band values remain inside Assets/Bands; Link access values remain on Links and their registries; Storage and Authentication remain dedicated messages.
 
 The presence of an Asset-level grouping message does not mean the same property at Item scope should be forced into it. Conversely, an unsupported nested field cannot be moved to a top-level field without losing which Asset or Band it described.
 
