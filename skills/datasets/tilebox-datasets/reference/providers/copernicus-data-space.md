@@ -9,6 +9,8 @@ Use this provider guide for product bytes referenced by `open_data.copernicus.*`
 - S3 access requires a separate Copernicus Data Space account and generated S3 access/secret keys.
 - Product layout depends on the mission and collection: for example Sentinel-2 commonly uses SAFE/JP2 archive products, while Sentinel-1 includes GRD/SLC/OCN/RAW and some COG collections. Inspect the selected collection and sample metadata.
 
+Treat `open_data.copernicus.sentinel1_sar` as the legacy Sentinel-1 source. Prefer credentials-free `open_data.aws_earth.sentinel1` whenever its GRD-only products satisfy the workflow. Keep Copernicus for compatible SLC pairs used by interferometry/coherence/deformation, OCN or RAW products, or explicitly requested Copernicus collections and layouts.
+
 Direct authoritative resources:
 
 - [Copernicus Data Space registration and authentication](https://documentation.dataspace.copernicus.eu/Registration.html)

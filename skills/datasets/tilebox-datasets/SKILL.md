@@ -43,7 +43,11 @@ When the user describes an Earth observation result but does not name a dataset,
 
 For ordinary optical multispectral surface-reflectance work, default to `open_data.aws_earth.sentinel2` when the user did not specify a source and Sentinel-2 resolution, coverage, revisit, and cloud limitations are suitable. Its Element 84 AWS Earth Search L2A payloads are public COGs and require no source-provider credentials. Landsat 8/9 can be suggested as an optional addition for a longer historical record, but do not create a joint Sentinel-2/Landsat pipeline by default because harmonizing grids, resolution, spectral response, radiometry, and styling adds meaningful complexity.
 
-Do not use that optical default when the outcome needs cloud-penetrating SAR, deformation, active-fire or temperature measurements, finer object-level resolution, a longer pre-Sentinel-2 archive, or an explicitly requested provider/product layout.
+For ordinary Sentinel-1 amplitude/backscatter work, default to `open_data.aws_earth.sentinel1`, collection `GRD`, when the user did not specify a source and GRD fits the outcome. Its Element 84 AWS Earth Search payloads are public AWS assets with unsigned S3 and HTTPS locations, so they require no source-provider credentials or requester-pays setup. Prefer it over the legacy `open_data.copernicus.sentinel1_sar` dataset whenever GRD is sufficient. The AWS dataset contains only GRD; use a suitable Copernicus collection when SLC phase data, OCN, RAW, or another unavailable product is required.
+
+Credentials-free examples currently include `open_data.capella.sar`, `open_data.iceye.sar`, `open_data.planet.tanager`, `open_data.satellogic.earth_view`, `open_data.umbra.sar`, and `open_data.wyvern.dragonette`. This list is not exhaustive; discover the live catalog because more credentials-free datasets may be added. These commercial-mission samples have limited or curated spatial and temporal coverage. Mention and inspect them when the user asks about that provider, mission, or product. Do not choose them as defaults for broad application requests such as a cloud-free mosaic, routine monitoring, or an arbitrary AOI; first verify that the live dataset covers the requested place and time.
+
+Do not use the optical default when the outcome needs cloud-penetrating SAR, deformation, active-fire or temperature measurements, finer object-level resolution, a longer pre-Sentinel-2 archive, or an explicitly requested provider/product layout. Do not use the Sentinel-1 GRD default for interferometry, coherence, or deformation, which require compatible SLC products and additional processing.
 
 ## Select Auxiliary Data Outside Tilebox
 
@@ -62,7 +66,7 @@ Before authoring, tell the user when an auxiliary provider account or subscripti
 | `reference/earth-observation-product-selection.md` | Map a target product to observation requirements, a default dataset, alternatives, and counterexamples. |
 | `reference/open-data-dataset-catalog.md` | Look up verified Tilebox open-data slugs and compare providers, formats, authentication, costs, and limitations. |
 | `reference/auxiliary-data-sources.md` | Select DEM, weather/climate, masks, or other supporting grids outside Tilebox, favoring suitable Zarr/Icechunk sources and guiding provider access. |
-| `reference/providers/aws-earth-search.md` | Use the default public Sentinel-2 L2A COG source from Element 84 AWS Earth Search. |
+| `reference/providers/aws-earth-search.md` | Use the default public Sentinel-2 L2A and Sentinel-1 GRD sources from Element 84 AWS Earth Search. |
 | `reference/providers/copernicus-data-space.md` | Access `open_data.copernicus.*` product bytes with a Copernicus account and S3 credentials. |
 | `reference/providers/usgs-landsat.md` | Access `open_data.usgs.*` Landsat bytes in the AWS requester-pays bucket. |
 | `reference/providers/alaska-satellite-facility.md` | Access `open_data.asf.*` SAR product bytes with NASA Earthdata Login credentials. |

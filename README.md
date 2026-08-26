@@ -122,7 +122,7 @@ Use these cases when reviewing changes to skill discovery and routing. Skill sel
 | “Create a cloud-free optical timelapse for this AOI over the last two years.” | Select AWS Earth Search Sentinel-2 L2A and public COG access by default; do not require source-provider credentials. |
 | “Build a forty-year vegetation history.” | Consider the USGS Landsat archive, explain 30 m and requester-pays tradeoffs, and do not choose Sentinel-2 solely because it is easier to access. |
 | “Use Copernicus Data Space Sentinel-2 SAFE products.” | Respect the explicit source, explain metadata-versus-payload access, and guide account and S3 credential setup from direct Copernicus links. |
-| “Map flooding during this cloudy storm.” | Do not blindly select optical Sentinel-2; choose and validate a suitable SAR source and explain provider access. |
+| “Map flooding during this cloudy storm.” | Do not blindly select optical Sentinel-2; default to credentials-free `open_data.aws_earth.sentinel1` `GRD` when suitable and explain that GRD does not support phase-based InSAR. |
 | “Add a timelapse to this initialized Tilebox workflow.” | Detect `tilebox.workflow.toml`, skip initialization, select the source, and author the processing. |
 | “Move this locally working timelapse to remote runners.” | Warn that local output paths are not shared/durable and guide shared output-storage setup before remote execution. |
 | “Explain common approaches to flood mapping.” | Answer the conceptual question; do not create or deploy a workflow unless implementation is requested. |

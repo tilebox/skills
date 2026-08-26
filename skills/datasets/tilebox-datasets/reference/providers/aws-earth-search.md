@@ -1,29 +1,32 @@
 # Element 84 AWS Earth Search
 
-Use this provider guide for `open_data.aws_earth.sentinel2`, the default Tilebox source for ordinary optical multispectral surface-reflectance workflows when Sentinel-2 is scientifically suitable.
+Use this provider guide for the credentials-free `open_data.aws_earth.sentinel2` and `open_data.aws_earth.sentinel1` datasets. They are the default Tilebox sources for ordinary Sentinel-2 L2A optical and Sentinel-1 GRD amplitude/backscatter workflows when those products are scientifically suitable.
 
 ## Access Model
 
-- Tilebox indexes Sentinel-2 L2A metadata and canonical asset locations.
-- Element 84 manages the Sentinel-2 Cloud Optimized GeoTIFF archive in AWS Open Data.
-- The source COG bucket supports unsigned access; no AWS account or source-provider credentials are required.
+- Tilebox indexes Sentinel-2 L2A and Sentinel-1 Level-1 GRD metadata and canonical asset locations.
+- Element 84 publishes both catalogs through Earth Search with public AWS product assets.
+- The source buckets support unsigned access and are not requester-pays; no AWS account or source-provider credentials are required.
 - Tilebox authentication is still required for Tilebox metadata queries and workflow/job operations.
-- The live Tilebox dataset currently exposes an `L2A` collection and STAC-style assets with public HTTPS and S3 access profiles. Inspect sample datapoints before assuming which profile is primary.
+- `open_data.aws_earth.sentinel2` exposes `L2A`. `open_data.aws_earth.sentinel1` exposes only `GRD`, with polarization COGs plus SAFE manifest and product/calibration/noise metadata. Both provide public S3 and HTTPS locations. Inspect sample datapoints before assuming asset keys or which profile is primary.
 
 Direct authoritative resources:
 
 - [AWS Open Data Registry: Sentinel-2 Cloud-Optimized GeoTIFFs](https://registry.opendata.aws/sentinel-2-l2a-cogs/)
+- [AWS Open Data Registry: Sentinel-1](https://registry.opendata.aws/sentinel-1/)
 - [Element 84 Earth Search repository and collection notes](https://github.com/Element84/earth-search)
 
 ## Selection Policy
 
 Default to this source for Sentinel-2 L2A timelapses, mosaics, natural/false color, vegetation indices, crop/forest monitoring, land cover, burn scars, and similar optical products unless the user specifies another source or the requirements need a different modality, resolution, archive length, or product layout.
 
-Do not switch to Copernicus Data Space merely because both index Sentinel-2. Use Copernicus when original archive products, SAFE/JP2 structure, or a Copernicus-specific collection is required.
+Default to `open_data.aws_earth.sentinel1` for Sentinel-1 GRD flood/change mapping, backscatter analysis, and maritime workflows unless the user specifies another source or needs another product. Prefer it over `open_data.copernicus.sentinel1_sar` whenever GRD is sufficient. Do not use it for interferometry, coherence, or deformation: those require compatible SLC phase products, which this dataset does not contain.
+
+Do not switch to Copernicus Data Space merely because both providers index the same mission. Use Copernicus when original Sentinel-2 SAFE/JP2 products, Sentinel-1 SLC/OCN/RAW, or another Copernicus-specific collection or layout is required.
 
 ## Access And Validation
 
-1. Run `tilebox dataset get open_data.aws_earth.sentinel2 --json` and inspect `L2A`, fields, and asset/storage descriptions.
+1. Run `tilebox dataset get <slug> --json` and inspect the expected `L2A` or `GRD` collection, fields, and asset/storage descriptions.
 2. Query a small AOI/time sample and inspect the actual `assets` and `storage` values returned by the SDK.
 3. Use the Tilebox dataset as the discovery mirror. Do not send separate search or catalogue requests to the Earth Search STAC API.
 4. Convert one selected datapoint with `AssetCollection.from_datapoint(...)`, then pass the required asset to `tilebox.storage.aio`. The resolver selects a compatible S3 or HTTPS location and configures unsigned access automatically when the location has no authentication requirement.

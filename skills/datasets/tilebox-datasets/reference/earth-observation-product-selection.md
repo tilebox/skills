@@ -10,6 +10,7 @@ Use this reference when the user names a target product but not a dataset. Start
 4. Verify the exact slug, collections, fields, coverage, and asset access through the live Tilebox API.
 5. Reject a default when its resolution, temporal coverage, modality, access requirements, or product semantics do not fit.
 6. Do not silently combine sensors. Offer multi-source processing only when its added history, cadence, or robustness justifies harmonization work.
+7. Do not substitute a limited-coverage commercial open-data sample for a broad-coverage default merely because its assets are credentials-free. Treat the sources in `open-data-dataset-catalog.md` as examples rather than an exhaustive list; discover new credentials-free datasets in the live catalog and consider them when explicitly requested or after a live query proves they cover the required AOI and time.
 
 ## Product Matrix
 
@@ -19,9 +20,9 @@ Use this reference when the user names a target product but not a dataset. Start
 | NDVI or related vegetation-index time series | Red/NIR and sometimes red-edge/SWIR surface reflectance, consistent scaling and masks | `open_data.aws_earth.sentinel2` `L2A` | Landsat 8/9 `L2_SR` | Longer history matters more than 10–20 m Sentinel-2 detail; a joint series is explicitly worth harmonizing | The requested variable is not measurable from reflectance alone |
 | Crop, forest, land-cover, burn-scar, or surface-change mapping | Multispectral reflectance, QA, suitable seasonal/event observations | `open_data.aws_earth.sentinel2` `L2A` | Landsat 8/9 `L2_SR`; SAR as complementary evidence | Historical baseline, cloud tolerance, or complementary structure/moisture information matters | The request means active fire, deformation, or cloud-obscured event mapping rather than optical surface change |
 | Long historical optical record | Stable multi-decade archive and comparable surface-reflectance products | Appropriate `open_data.usgs.landsat*` collections; use Landsat 8/9 `L2_SR` for modern work | Sentinel-2 as a recent higher-resolution addition | Recent 10–20 m detail is more important than archive length | The user expects Sentinel-2 resolution or a credentials-free source |
-| Flood or open-water extent under clouds | Cloud-tolerant event/baseline observations, comparable orbit/polarization and terrain handling | Suitable GRD collection in `open_data.copernicus.sentinel1_sar` | Sentinel-2 or Landsat as clear-sky context; another live SAR dataset when appropriate | Clear optical imagery exists and visual interpretation is sufficient, or another SAR archive better fits the period | A simple low-backscatter threshold cannot handle terrain, vegetation, urban areas, wind, or permanent water without validation |
+| Flood or open-water extent under clouds | Cloud-tolerant event/baseline observations, comparable orbit/polarization and terrain handling | `open_data.aws_earth.sentinel1` `GRD` | Sentinel-2 or Landsat as clear-sky context; another live SAR dataset when appropriate | Clear optical imagery exists and visual interpretation is sufficient, or another SAR archive better fits the period | A simple low-backscatter threshold cannot handle terrain, vegetation, urban areas, wind, or permanent water without validation |
 | Surface deformation or interferometry | Compatible SAR SLC pairs, orbit/baseline/phase processing | A suitable SLC collection in `open_data.copernicus.sentinel1_sar` | Historical ASF SAR sources when the period and processing stack fit | Historical mission coverage is required | Only GRD/amplitude products are available or no validated InSAR processing path exists |
-| Ship or maritime-object detection | Suitable SAR or high-resolution optical data, target-resolving pixels, coast/land masks, detector validation | Choose a suitable live SAR collection after checking target size and product resolution | Optical imagery as supporting context; ASF datasets when the indexed mission and period fit | Target size, sea state, coastline, archive period, or model requirements favor another source | Sentinel-2 or another source cannot resolve the target sizes reliably |
+| Ship or maritime-object detection | Suitable SAR or high-resolution optical data, target-resolving pixels, coast/land masks, detector validation | `open_data.aws_earth.sentinel1` `GRD` after checking target size and product resolution | Optical imagery as supporting context; ASF datasets when the indexed mission and period fit | Target size, sea state, coastline, archive period, or model requirements favor another source | Sentinel-1 GRD or another source cannot resolve the target sizes reliably |
 | Active fire, fire radiative power, or land-surface temperature | Thermal observations and the correct derived product | Relevant collections in `open_data.copernicus.sentinel3_slstr` such as FRP or LST, after live inspection | Landsat `L2_ST` for different spatial/temporal needs; optical imagery for later burn scars | Finer spatial detail or post-event surface mapping matters more than rapid/coarser thermal observation | The user requested a burn scar or visual timelapse rather than active heat |
 | Ocean/land color or water-quality proxy | Suitable spectral bands, atmospheric correction, water/land product semantics | Relevant collection in `open_data.copernicus.sentinel3_olci` after live inspection | Sentinel-2 for smaller inland/coastal areas when its bands and processing fit | Higher spatial detail matters more than OLCI coverage/cadence | The requested quantity cannot be inferred reliably from available reflectance |
 | Atmospheric composition | Mission-specific atmospheric products and vertical/column semantics | Relevant collection in `open_data.copernicus.sentinel5p_tropomi` after live inspection | Other atmospheric datasets when explicitly available and better suited | The requested constituent, cadence, or resolution requires another instrument | The user expects local surface concentrations or fine spatial detail unsupported by the product |
@@ -38,6 +39,17 @@ Choose `open_data.aws_earth.sentinel2` without asking the user to select a sourc
 For a satellite timelapse of a house, explain that Sentinel-2 can show the surrounding 3×3 km area, vegetation, land cover, and larger changes, but generally not fine roof-level detail.
 
 Landsat 8/9 can be offered as an optional addition for a longer or denser multi-mission sequence. Do not enable it by default: align grids and resolution, harmonize reflectance and spectral response, normalize styling, and preserve sensor provenance before mixing frames.
+
+## Sentinel-1 GRD Is The SAR Amplitude Default
+
+Choose `open_data.aws_earth.sentinel1`, collection `GRD`, without asking the user to select a source when all are true:
+
+- The outcome uses Sentinel-1 detected amplitude/backscatter, such as flood, change, or maritime analysis.
+- GRD has suitable mode, polarization, geometry, coverage, and resolution.
+- The user did not request Copernicus Data Space or another provider/product layout.
+- Credentials-free public AWS COG access is beneficial for the intended workflow.
+
+Prefer this source over `open_data.copernicus.sentinel1_sar` whenever GRD fits. The AWS dataset does not contain SLC, OCN, or RAW products. For interferometry, coherence, or deformation, select compatible SLC products from the Copernicus dataset instead and explain its provider credentials.
 
 ## Selection Summary
 

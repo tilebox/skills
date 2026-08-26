@@ -1,6 +1,6 @@
 # Sentinel-1 SAR Recipe
 
-Use `tilebox-datasets` to select and inspect the current source. Confirm product type, preprocessing, units, polarization, orbit, and pass direction from the portable [SAR product guidance](../../geospatial/products/sentinel-1-sar.md) before building the graph.
+Use `tilebox-datasets` to select and inspect the current source. For GRD amplitude/backscatter workflows, prefer credentials-free `open_data.aws_earth.sentinel1`, collection `GRD`, over the legacy Copernicus Sentinel-1 dataset whenever it fits. The AWS dataset contains only GRD; select a compatible SLC source for interferometry, coherence, or deformation. Confirm product type, preprocessing, units, polarization, orbit, and pass direction from the portable [SAR product guidance](../../geospatial/products/sentinel-1-sar.md) before building the graph.
 
 For pairwise change:
 
