@@ -14,4 +14,6 @@ SCL is categorical. Common classes distinguish no-data/defective/dark pixels, cl
 
 Choose resampling by semantics: nearest for SCL/classes/QA; nearest conservatively preserves reflectance samples, while bilinear/cubic can suit deliberate visualization or analysis. Never apply SCL directly to a differently shaped band. Combine classification with source nodata/read masks.
 
+Choose grouping to match the requested product: exact `datatake_id` for one acquisition, or UTC acquisition day for daily composites that may combine passes. Inspect the source schema for the grouping field; neither grouping guarantees full coverage or clear pixels.
+
 Use scene cloud cover only as a prefilter; compute AOI-level validity from SCL for stringent selection. A common mosaic aligns observations, masks invalid pixels, and reduces valid observations by median/quantile or another documented rule. Preserve dates, selected classes, scale, processing baseline, target grid, and remaining coverage.

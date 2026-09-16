@@ -2,7 +2,7 @@
 
 Follow the portable [model tiling and normalization guidance](../../geospatial/processing/ml-inference.md).
 
-1. A root task stores any large AOI/manifest externally, initializes the output grid/Zarr schema once, and submits compact model-tile inputs containing source/output keys, tile bounds, grid identity, and small model configuration.
+1. A root task stores any large AOI externally, initializes the output grid/Zarr schema once, and submits compact model-tile inputs containing source/output keys, tile bounds, grid identity, and small model configuration.
 2. Each inference task reads a bounded source COG/Zarr region, including halo, and computes grid-derived positional inputs.
 3. Lazily load and process-cache the model; obtain weights from a verified runner-local cache or accessible object storage.
 4. Crop halo outputs and map patch-grid outputs to deterministic non-overlapping Zarr regions, or emit per-tile vectors under deterministic keys. The same tile retry must target the same output.

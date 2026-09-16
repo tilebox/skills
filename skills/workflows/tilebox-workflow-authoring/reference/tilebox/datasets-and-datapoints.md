@@ -17,6 +17,8 @@ data = dataset.query(
 
 Use Shapely geometry for `spatial_extent`. Name collections explicitly; omitted collections query all. Use `skip_data=True` only for metadata probes because it omits fields needed later. Inspect schema and a small result to confirm fields, canonical assets, scale/offset, nodata, and QA semantics.
 
+Give each query one owner: query/select once and cache the required assets and metadata for downstream tasks, or partition the time range into non-overlapping intervals and query directly in the leaf tasks. Avoid querying datapoints in the parent just to pass IDs that children immediately query again. Use parent selection when grouping or ranking needs the full candidate set.
+
 Asset decoding requires exactly one datapoint:
 
 ```python

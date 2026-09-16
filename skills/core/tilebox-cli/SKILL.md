@@ -152,22 +152,22 @@ Keep the same filters and sort order across pages. Only change `--cursor`.
 
 ## Installing The CLI
 
-The public installer downloads a released binary, verifies checksums, and installs to `$HOME/.local/bin` by default:
+The setup wizard installs the Tilebox CLI and Agent Skills, and offers to install `uv` if it is missing:
 
 ```bash
-curl -fsSL https://cli.tilebox.com/install.sh | sh
+curl -fsSL https://install.tilebox.com/wizard.sh | sh
 ```
 
-Customize the install directory:
+The CLI installer downloads a released binary, verifies checksums, and installs to `$HOME/.local/bin` by default. To install only the CLI with a custom install directory:
 
 ```bash
-curl -fsSL https://cli.tilebox.com/install.sh | TILEBOX_INSTALL_DIR="$HOME/bin" sh
+curl -fsSL https://install.tilebox.com/cli.sh | TILEBOX_INSTALL_DIR="$HOME/bin" sh
 ```
 
 Install a specific version:
 
 ```bash
-curl -fsSL https://cli.tilebox.com/install.sh | TILEBOX_VERSION=0.3.1 sh
+curl -fsSL https://install.tilebox.com/cli.sh | TILEBOX_VERSION=0.3.1 sh
 ```
 
 Ensure the install directory is on `PATH`, set `TILEBOX_API_KEY`, then verify the installation and authentication:
