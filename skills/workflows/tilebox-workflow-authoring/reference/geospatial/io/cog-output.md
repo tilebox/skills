@@ -27,7 +27,9 @@ Do not call a plain tiled GeoTIFF a COG. Produce it with a COG-aware driver/libr
 
 ## Writing Tools
 
-Use one of:
+Prefer the COG writer provided by the array library already in use, such as `odc.geo.cog.write_cog` for georeferenced xarray data. Use its encoding defaults unless the product requires overrides. When encoded bytes and temporary arrays fit memory, `write_cog(array, ":mem:")` avoids staging files; otherwise write to a file or use a bounded writer.
+
+Other options:
 
 - GDAL COG driver
 - `rio-cogeo`

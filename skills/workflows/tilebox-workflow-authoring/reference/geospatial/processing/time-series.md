@@ -2,7 +2,7 @@
 
 ## Establish The Sequence
 
-Define the AOI and output grid; start/end dates and expected cadence; sensor, product level, bands, and quality layers; the frame rule when several scenes cover a period; missing-period behavior (omit, hold, explicitly render no data, or interpolate only when scientifically justified); and final frames, contact sheet, video, periodic COGs, or Zarr cube. Sort by acquisition metadata, not filenames. Preserve timestamps and product IDs in metadata when practical. A separate manifest is optional—use it when requested or materially useful, not automatically for a simple GIF.
+Define the AOI and output grid; start/end dates and expected cadence; sensor, product level, bands, and quality layers; the frame rule when several scenes cover a period; missing-period behavior (omit, hold, explicitly render no data, or interpolate only when scientifically justified); and the requested output format. Sort by acquisition metadata, not filenames. Preserve timestamps and product IDs in artifact metadata or logs; create a separate manifest only when the user asks.
 
 For an interactive timeline or map, publish COG or Zarr for a separate application. Processing must not generate frontend code or host the application.
 
@@ -18,7 +18,7 @@ Common choices are lowest-cloud/highest-quality observation, median or robust st
 
 ## Output Formats
 
-Use MP4 for broadly compatible video when codecs are available, WebM for suitable web delivery, GIF only for short low-color previews, and PNG/WebP/JPEG when a consumer assembles frames. Fix frame dimensions and pixel format. Make durations/timestamps explicit; do not silently display irregular acquisitions at equal spacing unless intentional. Publish the requested artifact and only useful support: a representative frame, optional ordered manifest, grid/style/missing-frame metadata, and checksums or sizes where practical.
+Use MP4 for broadly compatible video when codecs are available, WebM for suitable web delivery, GIF only for short low-color previews, and PNG/WebP/JPEG when a consumer assembles frames. Fix frame dimensions and pixel format. Make durations/timestamps explicit; do not silently display irregular acquisitions at equal spacing unless intentional. Publish the requested artifact; keep grid/style/missing-frame metadata in it or in logs rather than adding support files by default.
 
 ## Verification
 

@@ -43,36 +43,29 @@ Sketch the task graph:
 4. Choose task fields versus `context.job_cache` versus durable object/Zarr artifacts.
 5. Choose retry behavior for idempotent network/storage operations.
 
-### Structure Non-Trivial Workflows As Packages
+### Keep The Implementation Small
 
-Treat the generated `runner.py` as a starting scaffold, not the default home for the entire implementation. A single file is acceptable for a genuinely small prototype with one or two short tasks and little processing logic. When the workflow has multiple stages or task types, substantial dataset/raster/encoding logic, reusable helpers, or independently testable processing logic, split it into an importable package with modules organized by coherent responsibility.
+- Start with the simplest result that fulfills the request. Add more specific selection, quality policies, or processing stages only when required for correctness or requested in iteration.
+- Select the inputs needed for the requested result before expensive processing; do not compute every candidate product by default.
+- Avoid querying the same datapoints twice: cache selected assets/metadata for consumers, or partition time ranges and query in leaf tasks.
+- Read each asset's full AOI window once when the working set fits memory; subdivide reads only as part of explicit spatial chunking, not to match small output blocks.
+- Expose run-specific choices as task inputs; keep implementation and display defaults in the functions that own them unless users need to configure them.
+- Compose short tasks from processing functions. Reuse a function for genuinely shared operations, parameterizing the differences; inline trivial API wrappers and avoid speculative frameworks.
+- Use existing library operations for grids, array masking, reprojection, image composition, and encoding before writing custom implementations. Keep calibration, nodata, alignment, and scientific validation explicit.
+- Validate external inputs and scientific preconditions; let unexpected failures propagate to Tilebox rather than adding speculative fallbacks or custom retry layers.
+- Produce requested deliverables and intermediates consumed by the graph. Do not add manifests, provenance/quality sidecars, or extra exports unless the user asks. Keep useful source IDs, parameters, and quality information in existing artifact metadata or structured logs.
 
-Keep `runner.py` as a thin composition root: import every registered task, construct the `Runner`, and configure runner-level cache or logging. Do not put task execution methods, dataset queries, raster processing, scientific algorithms, or output encoding there. Name the module containing the root task and main fanout after the workflow capability, such as `rgb_timelapse.py`, rather than a generic `orchestration.py`. Group other related task classes by workflow stage or domain, use concrete stage names such as `aggregation.py`, and keep portable processing/IO functions separate from Tilebox orchestration when that makes them easier to test. Avoid both a catch-all `utils.py` and one module per tiny class; extract a module only when it has a clear role.
+### Structure By Responsibility
 
-A non-trivial timelapse workflow might use:
+For multi-stage workflows, keep `runner.py` limited to task registration and runner configuration. Group task code and processing functions by responsibility; add modules only when they provide a useful boundary, not to follow a fixed layout or create one file per task. A single file is fine for a tiny prototype.
 
-```text
-runner.py                         # task registration and runner configuration only
-rgb_timelapse/
-  __init__.py
-  tasks/
-    __init__.py
-    rgb_timelapse.py              # root workflow task and fanout
-    frames.py                     # frame worker task
-    aggregation.py                # frame aggregation and encoding task
-  imagery.py                      # bounded reads, masking, and rendering
-  encoding.py                     # deterministic GIF encoding functions
-  models.py                       # shared typed values, only when needed
-tests/
-  test_imagery.py
-  test_encoding.py
-```
-
-Adapt the depth to the workflow: a smaller project can use `tasks.py`, `imagery.py`, and `runner.py` without a `tasks/` subpackage. Do not unit-test Tilebox task classes merely to assert submitted tasks, dependencies, progress, or logging; verify orchestration through release build/task discovery and a representative job's actual graph. Add focused tests only where useful for substantive underlying functions such as scene selection/grouping, transforms, masking, rendering, or encoding. Extract those functions from task execution methods so they can be tested without mocking `ExecutionContext`, but do not create trivial helpers solely to produce tests. Ensure every package module needed at runtime is included by the release build configuration, and verify imports from the built artifact rather than only from the working tree.
+Test substantive processing functions such as selection, masking, transforms, and encoding without mocking `ExecutionContext`; do not extract trivial helpers solely for tests. Verify orchestration through release build/task discovery and a representative job's actual graph, not task-class tests of submissions, progress, or logging. Include all runtime modules in the release and verify imports from the built artifact.
 
 ### Require Task-Level Parallelism
 
 Task-level fanout is a workflow design requirement, not an optional optimization. Whenever the requested output contains two or more independent units—such as scenes, seasonal or other time periods, AOIs, products, spatial chunks, or model tiles—represent those units as separate Tilebox tasks submitted with `context.submit_subtask(s)`. Infer this decomposition from the outcome; never require the user to name `submit_subtasks`, specify task counts, or prescribe a DAG. For example, a 12-scene timelapse that combines all frames requires a graph such as `1 root + 12 scene workers + 1 encoder`, not one task with a 12-iteration loop.
+
+Split independently computed outputs that use different source assets into separate tasks, even for the same scene or period. Shared metadata or a common QA mask does not require serial execution. Keep outputs together when they reuse the same expensive read or computation.
 
 Use an orchestration task to submit independent workers and a separate aggregation or publication task with `depends_on` when the output combines their results. Never hide schedulable fanout inside a sequential loop, `asyncio.gather`, threads, or local multiprocessing in one task; additional runners can only parallelize separate Tilebox tasks. A small first run or scheduling overhead is not a reason to collapse independent work into one task. If the natural units are too fine-grained for individual scheduling, batch them into multiple balanced worker tasks rather than one task. Keep work in one task only when no two units can run independently because the work is genuinely indivisible or dependency-ordered, or when the user explicitly requires single-task execution.
 
@@ -103,7 +96,7 @@ class ProcessScene(Task):
 ```
 
 - Default `v0.0` identifiers are acceptable for prototypes. Stable identifiers return `(name, vX.Y)`.
-- Minor versions are forward-compatible; bump major for breaking input/behavior changes.
+- Keep the initial version while iterating before rollout. Once compatibility matters, minor versions are forward-compatible; bump major for breaking input/behavior changes.
 - Keep the complete serialized input at most 2048 bytes. Pass compact plain-Python or supported library values, IDs, keys, and small configuration—not arrays, dataframes, xarray datasets, large geometry, manifests, credentials, clients, open files, or local paths. Use `context.job_cache` or durable storage according to `reference/tilebox/state-and-artifacts.md`.
 - Register every task class used by jobs with the runner.
 
@@ -148,7 +141,7 @@ class ProcessScenes(Task):
 ```
 
 - Use `submit_subtask` for one child and `submit_subtasks` for homogeneous batches.
-- Pass returned handles to `depends_on`; prefer stage barriers over thousands of unique pairwise dependencies.
+- Prefer shared stage barriers: submit all `A` tasks, then submit the `B` batch with `depends_on=all_a_handles`, rather than creating a separate `B[i] → A[i]` dependency group per item. For a single downstream task consuming only one producer's output, depend on that producer instead of unrelated peers.
 - Use `optional=True` only for non-critical work.
 - Make side effects idempotent: deterministic keys, overwrite-safe writes, valid-output checks, or atomic commits. Retrying uses the original task input.
 
@@ -156,7 +149,7 @@ class ProcessScenes(Task):
 
 Set concise `current_task.display` labels before expensive work. For meaningful fanout, the submitting task calls `context.progress(name).add(n)` and each successful worker calls `.done(1)` after completing its represented unit. Totals and completions must match.
 
-Use `context.logger` with structured fields and `logger.bind` for repeated context. In exception handlers, call `logger.exception` and re-raise. Wrap expensive IO/compute/publish phases in `context.tracer.span(...)` and add useful filter attributes. Configure console logging in the runner entrypoint, not task classes.
+Use `context.logger` with structured fields and `logger.bind` for repeated context. Wrap expensive phases in `context.tracer.span(...)`; pass that tracer into helpers needing child spans rather than constructing a global OpenTelemetry tracer. Add exception handlers only for recovery or useful context; log exceptions with `logger.exception` and re-raise. Configure console logging in the runner entrypoint, not task classes.
 
 ## Dataset, Asset, And Storage Boundaries
 
