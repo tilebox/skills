@@ -46,11 +46,12 @@ Sketch the task graph:
 ### Keep The Implementation Small
 
 - Start with the simplest result that fulfills the request. Add more specific selection, quality policies, or processing stages only when required for correctness or requested in iteration.
+- When asked for a workflow, deliver runnable Tilebox tasks and runner registration. Local previews can validate processing along the way, but do not stop at a standalone script or require the user to request each implementation stage.
 - Select the inputs needed for the requested result before expensive processing; do not compute every candidate product by default.
 - Avoid querying the same datapoints twice: cache selected assets/metadata for consumers, or partition time ranges and query in leaf tasks.
 - Read each asset's full AOI window once when the working set fits memory; subdivide reads only as part of explicit spatial chunking, not to match small output blocks.
 - Expose run-specific choices as task inputs; keep implementation and display defaults in the functions that own them unless users need to configure them.
-- Compose short tasks from processing functions. Reuse a function for genuinely shared operations, parameterizing the differences; inline trivial API wrappers and avoid speculative frameworks.
+- Extract processing functions when they improve readability, testability, or reuse; straightforward processing may stay in `execute`. Reuse a function for genuinely shared operations, parameterizing the differences; inline trivial API wrappers and avoid speculative frameworks.
 - Use existing library operations for grids, array masking, reprojection, image composition, and encoding before writing custom implementations. Keep calibration, nodata, alignment, and scientific validation explicit.
 - Validate external inputs and scientific preconditions; let unexpected failures propagate to Tilebox rather than adding speculative fallbacks or custom retry layers.
 - Produce requested deliverables and intermediates consumed by the graph. Do not add manifests, provenance/quality sidecars, or extra exports unless the user asks. Keep useful source IDs, parameters, and quality information in existing artifact metadata or structured logs.
@@ -63,11 +64,15 @@ Test substantive processing functions such as selection, masking, transforms, an
 
 ### Require Task-Level Parallelism
 
-Task-level fanout is a workflow design requirement, not an optional optimization. Whenever the requested output contains two or more independent units—such as scenes, seasonal or other time periods, AOIs, products, spatial chunks, or model tiles—represent those units as separate Tilebox tasks submitted with `context.submit_subtask(s)`. Infer this decomposition from the outcome; never require the user to name `submit_subtasks`, specify task counts, or prescribe a DAG. For example, a 12-scene timelapse that combines all frames requires a graph such as `1 root + 12 scene workers + 1 encoder`, not one task with a 12-iteration loop.
+Task-level fanout is a workflow design requirement, not an optional optimization. Choose a fanout axis from the requested outputs and workload: scenes, time periods, AOIs, products, spatial chunks, or model tiles. Represent independent units on that axis as separate Tilebox tasks submitted with `context.submit_subtask(s)`. Infer this decomposition from the outcome; never require the user to name `submit_subtasks`, specify task counts, or prescribe a DAG. For example, a 12-scene timelapse that combines all frames requires a graph such as `1 root + 12 scene workers + 1 encoder`, not one task with a 12-iteration loop.
 
 Split independently computed outputs that use different source assets into separate tasks, even for the same scene or period. Shared metadata or a common QA mask does not require serial execution. Keep outputs together when they reuse the same expensive read or computation.
 
-Use an orchestration task to submit independent workers and a separate aggregation or publication task with `depends_on` when the output combines their results. Never hide schedulable fanout inside a sequential loop, `asyncio.gather`, threads, or local multiprocessing in one task; additional runners can only parallelize separate Tilebox tasks. A small first run or scheduling overhead is not a reason to collapse independent work into one task. If the natural units are too fine-grained for individual scheduling, batch them into multiple balanced worker tasks rather than one task. Keep work in one task only when no two units can run independently because the work is genuinely indivisible or dependency-ordered, or when the user explicitly requires single-task execution.
+For a small workflow with several independent output rasters, fan out by output TIFF, such as RGB and NBR for each comparison date. Each worker may read a few bands from the selected granules and mosaic them in memory when its output, reads, and processing temporaries fit the per-worker memory budget at the intended runner concurrency. This keeps output-level parallelism without requiring per-granule tasks or a Zarr intermediate for the mosaic.
+
+For larger areas or input sets that require distributed mosaicing, fan out across granules, subdividing oversized granule work into bounded windows, then aggregate per output chunk. Keep the requested compositing rule unchanged when changing the graph. See `reference/tilebox/geospatial-task-graphs.md` for chunked reductions.
+
+Use an orchestration task to submit independent workers and aggregation or publication tasks with `depends_on` when outputs combine their results. Loops or async reads within a bounded output worker are allowed; they do not replace fanout across independent outputs or the granule/chunk fanout needed for larger mosaics. Never replace that fanout with `asyncio.gather`, threads, or local multiprocessing in one task; additional runners can only parallelize separate Tilebox tasks. A small first run or scheduling overhead is not a reason to collapse the workflow into one task. Batch very fine-grained work into multiple balanced workers. Use a single-task workflow only when the work is genuinely indivisible or dependency-ordered, or the user explicitly requires it.
 
 Before coding, record the expected graph shape. After running a representative job, compare `execution_stats.total_tasks` and `task_summaries` with that shape. Progress units and child tracing spans are not tasks and do not prove fanout. If the graph does not match, fix the workflow before reporting completion. When runner capacity permits, use task timestamps or spans to verify that independent workers overlapped.
 
@@ -123,7 +128,7 @@ class FetchMetadata(Task):
         context.logger.info("Metadata fetched", count=len(responses))
 ```
 
-Choose client lifetime according to its event-loop behavior: create `niquests.AsyncSession` inside `execute`, while `tilebox.storage.aio.Client` may be reused across task executions. See `reference/tilebox/tasks-and-graphs.md` for details. Bound large request sets with a semaphore or bounded batches. Async concurrency is appropriate for multiple IO requests that belong to one task, such as the bands or byte ranges needed for one scene. It does not replace task-level fanout for independent scenes, AOIs, time periods, products, chunks, or model tiles. Keep `runner.run_all()` and `runner.run_forever()` in synchronous runner entrypoints rather than calling them from async code.
+Choose client lifetime according to its event-loop behavior: create `niquests.AsyncSession` inside `execute`, while `tilebox.storage.aio.Client` may be reused across task executions. See `reference/tilebox/tasks-and-graphs.md` for details. Bound large request sets with a semaphore or bounded batches. Async concurrency is appropriate for multiple IO requests within a chosen worker unit, such as bands or byte ranges for one scene or a bounded in-memory mosaic. It does not replace the required task-level fanout. Keep `runner.run_all()` and `runner.run_forever()` in synchronous runner entrypoints rather than calling them from async code.
 
 ## Build Simple Dynamic Graphs
 
