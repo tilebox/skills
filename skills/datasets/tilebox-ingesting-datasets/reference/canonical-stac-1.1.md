@@ -115,12 +115,12 @@ Map supported simple class fields directly. Packed classification bitfields need
 
 ### SAR, Satellite, Product, And Processing
 
-- Use closed SAR enums for frequency band, polarization, and observation direction.
-- Keep open instrument mode and product type strings as strings.
+- Use schema-local enums for closed Item-level SAR frequency band, polarization, and observation direction values; polarization arrays use repeated enums. Do not choose legacy well-known enum field types for new datasets.
+- Keep open instrument mode and product type values as strings unless an authoritative provider contract establishes a closed vocabulary for the approved dataset scope.
 - Normalize deprecated `sar:product_type` into `product:type` semantics, but expose the canonical Item property as a generated field rather than a ProductProperties container.
 - Preserve different C/Ku or other frequency values on their individual Bands.
 - Keep Satellite orbit category separate from timestamped orbit state vectors.
-- Keep Product acquisition type as its closed enum; product type and timeliness category remain open strings.
+- Use a schema-local enum for closed Product acquisition types. Product type and timeliness category are open in STAC; a documented dataset-specific vocabulary may narrow them without claiming a global STAC restriction.
 - Map `processing:software` as one typed software/version map, not one generated field per dynamic software name.
 - Normalize provider properties named `processing_level`, `processingLevel`, or equivalent into the canonical `processing:level` property. Map source values to the STAC Processing extension's suggested levels from product semantics and authoritative provider documentation; do not merely prepend `L` or copy an ambiguous code. Define each accepted mapping in the source/version recipe and reject unknown values. For example, a Sentinel-1 GRD source level `"1"` becomes `"L1"`, not `"L0"`.
 
@@ -151,7 +151,7 @@ Follow the STAC Authentication extension whenever it can represent the source. P
 
 ## Open And Closed Vocabularies
 
-Reject unknown values only when the relevant STAC specification closes the vocabulary. Use exact custom strings for open vocabularies.
+Reject unknown values when the relevant STAC specification or an approved provider-specific dataset contract closes the vocabulary. Suggested values and sampled Collection summaries alone are not closed vocabularies. Use exact strings for open vocabularies. For new dataset fields, declare closed values with `type: enum` and `enum_values`, adding `repeated: true` for multiple values. Legacy hardcoded/generated well-known enums remain supported only for existing dataset-field compatibility; use the current SDK types for enum members inside dedicated messages such as Assets and Bands.
 
 ### Media Types
 

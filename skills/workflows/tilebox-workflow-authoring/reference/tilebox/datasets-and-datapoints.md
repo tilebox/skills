@@ -17,6 +17,20 @@ data = dataset.query(
 
 Use Shapely geometry for `spatial_extent`. Name collections explicitly; omitted collections query all. Use `skip_data=True` only for metadata probes because it omits fields needed later. Inspect schema and a small result to confirm fields, canonical assets, scale/offset, nodata, and QA semantics.
 
+Push categorical selection into the query when the live schema marks scalar or repeated enums queryable. Use exact public strings and compose one `filter=` expression:
+
+```python
+from tilebox.datasets import field
+
+selected = dataset.query(
+    temporal_extent=(start, end),
+    filter=(field("product_type") == "L2")
+    & field("use_cases").contains_any(["agriculture", "flood-monitoring"]),
+)
+```
+
+This example requires those fields and values in the inspected schema; do not assume existing open-data datasets have migrated from legacy enum/string types. Repeated enums also support `.contains(value)` and `.contains_all(values)`. Missing/empty lists are empty sets, so negated membership includes them; missing scalars are excluded by inequality unless a null branch is added. Python returns repeated enums as one-dimensional object columns with a `list[str]` per row, not a padded extra dimension. The `tilebox-datasets` skill owns the full enum schema, query, and evolution contract.
+
 Give each query one owner: query/select once and cache the required assets and metadata for downstream tasks, or partition the time range into non-overlapping intervals and query directly in the leaf tasks. Avoid querying datapoints in the parent just to pass IDs that children immediately query again. Use parent selection when grouping or ranking needs the full candidate set.
 
 Asset decoding requires exactly one datapoint:

@@ -106,6 +106,10 @@ For standard STAC properties, identify both the source extension version and the
 
 Inventory decimal JSON strings that may be semantically numeric across representative records and variants. Convert them to the narrowest valid Tilebox integer only when documentation or consistent evidence establishes integer semantics; retain digit-only identifiers and codes as strings. Record accepted ranges and reject non-decimal or out-of-range values.
 
+Inventory scalar and repeated closed vocabularies separately. Record whether each vocabulary comes from a canonical schema, an authoritative provider contract, or a deliberately bounded dataset scope; a small observed set is not enough. Use schema-local enums for these fields, preserving exact public strings and declaring queryability before ingestion. Keep open values as strings and dedicated nested message values on their existing SDK contracts. See `stac-protobuf-mapping.md` for Landsat and Sentinel-5P examples.
+
+Define how new values are reviewed and appended, how unknown values fail or are quarantined, and whether repeated values have a canonical order. Repeated enums deduplicate values and collapse missing/empty lists; confirm that neither multiplicity nor that presence distinction carries source meaning. Do not create new well-known enum definitions or silently extend the schema from the running converter.
+
 Use modern canonical STAC 1.1 JSON paths for schema mapping even when the source is older STAC or non-STAC. Record original source paths separately. Do not mirror deprecated properties into the Tilebox schema when a canonical replacement exists; document whether each legacy property is transformed, split, used only for validation, or omitted as redundant.
 
 ## Encode Source Normalization Without Guessing
@@ -166,6 +170,12 @@ schema:
       queryable: false
       roles: []
       normalization: <rule>
+      # Include these only for schema-local enum fields:
+      enum_values: [<exact public strings in stable order>]
+      vocabulary_evidence: <authoritative vocabulary and approved dataset scope>
+      unknown_value_policy: <reject/quarantine; never silently use UNSPECIFIED>
+      vocabulary_update_policy: <review and append before ingestion resumes>
+      repeated_order_policy: <preserve first occurrence or documented canonical order>
 
 collections:
   names: [<approved names>]

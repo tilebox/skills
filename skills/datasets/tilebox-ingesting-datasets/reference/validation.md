@@ -62,6 +62,18 @@ Compare collection, identity, time, geometry, every populated property, Links, r
 
 Assert that the queried-back messages preserve the expected canonical STAC 1.1 semantics even though they are not exported as STAC Items.
 
+### Enum Coverage
+
+For each scalar/repeated enum the recipe uses, test observable behavior through the converter and SDK:
+
+- Preserve exact public strings, including punctuation, case, and leading zeros where relevant. Reject a nearby unknown value with record identity/path rather than silently using a default. A valid enum member can still be wrong for the record; test source-authority rules separately from membership.
+- Round-trip missing scalar values and repeated singleton, multi-value, empty, and omitted lists. Expect empty/omitted lists to be equivalent. Include duplicates and an asymmetric order such as `["forestry", "agriculture", "forestry"]`; storage should return `["forestry", "agriculture"]`, not sorted values or duplicates. Re-ingesting the duplicate-free equivalent should produce the same ID.
+- For queryable scalars, exercise equality and inequality with a missing-value control. Inequality and negated equality must exclude missing scalars unless explicitly ORed with a null check.
+- For queryable repeated fields, use fixtures containing only A, only B, both, and neither. Assert exact IDs for contains-all, contains-any, and negation; negation must include empty lists. Scalar equality and null checks on repeated enums must fail. Unknown filter values must fail rather than return zero rows.
+- Assert Python repeated-enum results contain lists per row, not padded arrays, and that query output can be re-ingested. For Go, assert annotation-aware public values rather than generated `.String()` symbols.
+
+When testing an ingestor's vocabulary-update procedure, use a disposable dataset: append a value, refresh the schema/types, and ingest/query it. Verify a populated dataset rejects rename/reorder/removal. Never test breaking updates on production datasets. See [Enum fields](../../tilebox-datasets/reference/enum-fields.md) for CLI versus SDK empty-predicate differences.
+
 ## Asset Accessibility
 
 Metadata correctness does not prove payload access. Treat locations as paths during conversion, then separately test one bounded metadata/range request or storage-client open for each promised access mode. Confirm authentication, requester-pays/custom endpoints, alternate selection, and which modes were tested; avoid full downloads.

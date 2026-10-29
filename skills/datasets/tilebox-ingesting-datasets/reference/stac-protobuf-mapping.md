@@ -29,7 +29,7 @@ Refresh CLI support before creating the schema:
 tilebox agent-context dataset create --output-schema
 ```
 
-Current schema fields support scalar and Tilebox well-known types, fully qualified `datasets.stac.v1` message and enum names, repetition, and these annotations:
+Current schema fields support scalar and Tilebox well-known message types, fully qualified `datasets.stac.v1` message names, schema-local enums with `enum_values`, repetition, and these annotations:
 
 - `description`
 - `example_value`
@@ -128,7 +128,7 @@ For example, `/properties/view:azimuth` and `/properties/view_azimuth` both prop
 
 ## Type And Shape Rules
 
-For a standard STAC extension property, use the JSON Schema for the modern canonical extension version as the authoritative target type contract. Use older schemas only to interpret legacy input before normalization. Do not substitute an extension README's field table or infer a different type only because sampled records happen to use one representation. Use representative non-null values to verify conformance, presence, width, and source defects. JSON Schema `number` normally maps to `float64`; `integer` maps to an integer type selected by the range rules below; closed strings map to an available Tilebox STAC enum; open strings remain strings. Preserve stable repeated element types and explicit presence for zero, false, and empty values. Null or missing becomes unset; null-only non-standard fields remain omitted until their type is known. Reject incompatible shape changes.
+For a standard STAC extension property, use the JSON Schema for the modern canonical extension version as the authoritative target type contract. Use older schemas only to interpret legacy input before normalization. Do not substitute an extension README's field table or infer a different type only because sampled records happen to use one representation. Use representative non-null values to verify conformance, presence, width, and source defects. JSON Schema `number` normally maps to `float64`; `integer` maps to an integer type selected by the range rules below; closed strings map to schema-local enums and arrays of closed strings to repeated enums. Open strings remain strings unless the approved dataset scope establishes a narrower vocabulary. Preserve stable repeated element types and explicit presence for scalar zero, false, and empty values. Null or missing becomes unset; repeated enums collapse missing and empty lists. Null-only non-standard fields remain omitted until their type is known. Reject incompatible shape changes.
 
 Choose integer widths deliberately before creating the dataset:
 
@@ -143,9 +143,39 @@ Some providers serialize semantically numeric integer properties as decimal JSON
 
 Do not use JSON strings, arbitrary Structs, or `google.protobuf.Value` to force a mixed field into the schema.
 
+## Closed Vocabularies
+
+Use `"type": "enum"` and an ordered `"enum_values"` list for new categorical fields. Add `"repeated": true` when a record can have several values. Legacy well-known enum types such as ProcessingLevel or SAR polarization enums remain compatible with old datasets but must not be chosen for new dataset fields. This rule does not replace enum members nested inside dedicated Assets/Bands or other messages.
+
+For a source whose documented Item-level SAR polarization vocabulary is limited to `HH`, `HV`, `VV`, and `VH`, use the following schema. This is a source-specific subset, not the full STAC polarization vocabulary:
+
+```json
+{
+  "name": "sar_polarizations",
+  "type": "enum",
+  "enum_values": ["HH", "HV", "VV", "VH"],
+  "repeated": true,
+  "queryable": true,
+  "description": "Polarizations available in the acquisition.",
+  "example_value": "[\"VV\", \"VH\"]",
+  "source_json_pointer": "/properties/sar:polarizations"
+}
+```
+
+Establish vocabulary provenance before creation:
+
+- Prefer an explicit `enum` in the canonical extension schema or an authoritative provider contract. A suggested-value list, Collection summary, or small sample alone does not close the vocabulary.
+- A provider-specific dataset can narrow an otherwise open STAC property when its documented scope warrants it. For example, Landsat `product:type` can use `L1TP`, `L1GT`, `L1GS`, `L2SP`, and `L2SR`; instruments can use the repeated vocabulary `mss`, `tm`, `etm+`, `oli`, `tirs`. Confirm coverage against the selected provider collections rather than claiming these are global STAC enums.
+- Sentinel-5P processing modes and product codes are scalar candidates. Preserve codes such as `OFFL`, `RPRO`, and `L2__NO2___` exactly, restricting the vocabulary to the approved source scope. Retrieval input codes and irradiance products are repeated candidates only after establishing their complete allowed values; an observed union is not an authoritative vocabulary.
+- Keep identifiers, evolving software versions, and unconstrained strings as strings. Digit-only categorical codes such as ESA collection `01` must retain leading zeros. Do not invent numeric category encodings to save queryable-string slots.
+- Record accepted values, normalization, unknown-value policy, and vocabulary-growth policy in the recipe. Fail or quarantine unknown values with source identity and path; do not map them silently to zero or `UNSPECIFIED`. Review and append valid additions through a separate schema update before ingestion resumes.
+- Repeated enums have set membership semantics and deduplicate values in first-occurrence order. They are unsuitable when multiplicity matters. Preserve source order unless the recipe explicitly defines a canonical order.
+
+Read [Enum fields](../../tilebox-datasets/reference/enum-fields.md) for the 100-value/128-code-point limits, scalar/list ingestion, CLI and SDK filters, and schema evolution. Do not create a shared enum registry or generate new well-known protobuf enum types for each vocabulary.
+
 ## STAC Message Boundaries
 
-At dataset field scope, use STAC-specific structured messages only for `Assets`, `Links`, repeated `Provider`, `ProcessingSoftware`, `Storage`, and `Authentication`. Geometry remains the required Tilebox spatial field. STAC enum types may be used for individual generated fields.
+At dataset field scope, use STAC-specific structured messages only for `Assets`, `Links`, repeated `Provider`, `ProcessingSoftware`, `Storage`, and `Authentication`. Geometry remains the required Tilebox spatial field. Use schema-local enums for individual closed-vocabulary fields.
 
 Do not use Item-level extension property-group messages such as `SARProperties`, `SatelliteProperties`, `ProductProperties`, or analogous convenience containers as dataset fields. Flatten each property the collection actually publishes into its own namespace-preserving generated field, with the type defined by the extension JSON Schema. Do not exhaustively add every property offered by an extension when the source does not publish it.
 
@@ -153,11 +183,11 @@ This rule does not authorize flattening nested metadata. Asset- and Band-scoped 
 
 ## Queryable Fields
 
-Make stable source identity queryable when users need direct record lookup. Add common, stable scalar filters only when a realistic use case and type are clear, such as cloud or nodata percentage, platform, product/processing identifier, orbit value, or projection code.
+Make stable source identity queryable when users need direct record lookup. Add common, stable filters when a realistic use case and type are clear, such as cloud or nodata percentage, platform, product/processing identifier, orbit value, or projection code. Scalar enums and repeated enums are both queryable without consuming the two-queryable-string allowance. Use repeated-enum filters for instruments, polarizations, or controlled application tags instead of creating duplicate collection views solely for filtering.
 
 Inspect a source STAC API's `/queryables` endpoint when available, but treat it as provider evidence rather than a list to copy. Select only fields that remain useful, stable, and correctly typed in the canonical Tilebox schema.
 
-Default large messages, repeated values, Assets, Links, registries, arbitrary structures, and low-value high-cardinality values to non-queryable. Queryable fields support typed filtering; they are not guaranteed secondary indexes.
+Default large messages, non-enum repeated values, Assets, Links, registries, arbitrary structures, and low-value high-cardinality values to non-queryable. Repeated enums are the queryable exception, using all/any membership rather than scalar comparison or null checks. Queryable fields support typed filtering; they are not guaranteed secondary indexes.
 
 Use `json_schema_ref` when the STAC Queryables definition identifies the property through a stable `$ref`. Keep the canonical pointer and schema reference separate.
 
@@ -175,11 +205,12 @@ Use separate datasets when record families cannot share one stable schema. Colle
 
 On non-empty datasets:
 
-- add compatible fields when needed;
+- append non-queryable fields when needed;
+- append enum values while retaining the existing vocabulary as an unchanged prefix;
 - update descriptions and documentation deliberately;
-- never retype, rename, remove, reorder, or renumber existing fields; and
+- never retype, rename, remove, reorder, renumber, or change queryability of existing fields; and
 - create a new dataset for incompatible wire changes.
 
-Treat field type choices as permanent once the first datapoint has been ingested. Do not rely on deleting datapoints or collections to make a later retype possible: deployed backends may retain ingestion history and reject the breaking update even when every current collection is empty. If a retype is rejected, create a replacement dataset with the corrected schema rather than restoring the old data and retrying.
+On empty datasets, the backend permits breaking field/vocabulary changes; counts include soft-deleted collections that remain restorable. Dataset kind cannot change even when empty. Do not delete data to force compatibility. Choose types and queryability before sample ingestion, and refresh SDK descriptors/regenerate Go types after vocabulary updates. Retyping a populated legacy enum/string field to a schema-local enum requires a replacement dataset and explicit conversion, not reuse of legacy numeric values.
 
 Inspect collection counts and the current schema before every update.

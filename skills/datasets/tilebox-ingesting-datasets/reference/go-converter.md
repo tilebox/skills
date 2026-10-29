@@ -37,6 +37,14 @@ datapoint := generatedv1.Scene_builder{
 
 Use the exact generated builder fields and preserve explicit presence. Do not replace the generated type with dynamic descriptors or a generic map.
 
+## Map Public Enum Values
+
+Schema-local enums generate dataset-owned Go enum types, including slice fields for repeated enums. Resolve exact provider strings through `datasets.NewDatapointDescriptor(dataset)` and its `EnumNumber(fieldName, publicValue)` method, handle lookup errors, then cast the returned number to the actual generated field enum type when populating the builder. Resolve each repeated member independently. This lookup does not require replacing the concrete generated datapoint with a dynamic message.
+
+Do not assume vocabulary position equals protobuf number, strip generated prefixes to recover public values, or reuse legacy well-known enum constants. Generated enum `.String()` yields protobuf symbols; use the annotation-aware SDK decoder when validation needs public strings. Missing scalar fields stay unset; zero is not a valid custom-enum value. Keep provider normalization separate from this lookup.
+
+Regenerate Go types and refresh descriptors after vocabulary updates. Use public strings in filters: `query.Field("product_type").Equal("L2")`, `query.Field("use_cases").ContainsAll("agriculture", "flood-monitoring")`, and `.ContainsAny("agriculture", "forestry")`. Read [Enum fields](../../tilebox-datasets/reference/enum-fields.md) for presence, normalization, and compatibility rules.
+
 ## Construct Semantic Values First
 
 Even without a Go semantic compiler, separate source conversion from wire compilation:

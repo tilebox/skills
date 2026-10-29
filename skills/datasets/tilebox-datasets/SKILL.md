@@ -26,8 +26,8 @@ Relevant docs concepts:
 - Datasets are strongly typed containers; every datapoint in a dataset follows the dataset schema.
 - Dataset kinds add required fields automatically. Do not include required fields in the custom schema.
 - Custom field descriptions and example values power automatic schema documentation.
-- Existing fields cannot be removed or changed after data has been ingested. New fields can be added because fields are optional.
-- A dataset that has never contained data can be freely edited. Do not assume deleting previously ingested data restores this freedom; verify the live backend before planning a breaking update.
+- On non-empty datasets, existing field types and queryability cannot change; new non-queryable fields can be appended and enum vocabularies can be extended.
+- Empty datasets allow breaking field changes, subject to backend validation. Counts include soft-deleted collections that remain restorable; do not delete data to force an update. Dataset kind cannot change even when empty.
 
 ## Select A Dataset From The Target Product
 
@@ -104,12 +104,16 @@ Choose the dataset kind:
 Custom schema rules:
 
 - Field names must be `snake_case` and valid code identifiers.
-- Supported field types are `string`, `bytes`, `bool`, `int32`, `int64`, `uint64`, `float64`, `Duration`, `Timestamp`, `UUID`, and `Geometry`.
+- Supported field types include `string`, `bytes`, `bool`, `int32`, `int64`, `uint64`, `float64`, `Duration`, `Timestamp`, `UUID`, `Geometry`, and schema-local `enum`.
+- Use `"type": "enum"` with `"enum_values": ["L1", "L2"]` for a closed vocabulary. Add `"repeated": true` for tags or other multi-valued categories. Both forms support `"queryable": true` and do not consume the two-queryable-string allowance.
+- Legacy well-known enum types remain supported for existing datasets but are deprecated for new fields. Use schema-local enums instead; keep dedicated message fields such as Assets on their existing SDK contracts.
 - Default bounded integers such as raster dimensions, bits per sample, counts, and row/column indices to `int32`. Use `int64` only when the source domain can exceed the signed 32-bit range. ProtoJSON renders 64-bit integers as strings, while `int32` renders as JSON numbers.
 - Set `"queryable": true` on custom fields that should support server-side filtering.
 - Set `"repeated": true` for array fields.
 - Include `description` and `example_value` for every field whenever possible; this improves generated dataset documentation.
-- Treat reordering, renaming, removing, or changing field types as breaking once the dataset has ever contained data.
+- Treat reordering, renaming, removing, or changing field types as breaking on non-empty datasets.
+
+Read [Enum fields](reference/enum-fields.md) when designing, ingesting, querying, or updating enums. It covers exact CLI/Python/Go examples, vocabulary limits, missing/empty semantics, repeated-value normalization, and legacy compatibility. Inspect `enumValues`, `repeated`, and `queryable` in the live schema rather than inferring a vocabulary from sample records.
 
 Example `schema.json`:
 
@@ -181,7 +185,7 @@ The dataset `description` is larger markdown documentation, not just a short sum
 - Dataset purpose and ownership.
 - Source systems and ingestion cadence.
 - Collection naming conventions.
-- Field semantics, units, enum-like values, and nullability expectations.
+- Field semantics, units, enum vocabularies, and nullability expectations.
 - Query examples and known caveats.
 
 Update documentation from a file:
@@ -202,7 +206,8 @@ Schema updates replace the full custom schema. Always start from the current sch
 
 Safe on non-empty datasets:
 
-- Add new custom fields.
+- Append new non-queryable custom fields.
+- Append enum values without changing the existing vocabulary prefix.
 - Update metadata such as name, summary, and markdown description.
 
 Only safe when all collections are empty:
@@ -210,9 +215,10 @@ Only safe when all collections are empty:
 - Remove custom fields.
 - Rename fields.
 - Change field types or repeated-ness.
+- Replace or reorder enum vocabularies, or change queryability.
 - Change dataset code name.
 
-Treat those changes as permanently unavailable after first ingestion unless a live update proves otherwise. Some deployed backends retain ingestion history and reject breaking schema or code-name changes even after all datapoints and collections are deleted. Choose field widths before sample ingestion; if the backend rejects a breaking update on an empty dataset, create a replacement dataset with the corrected schema.
+The backend decides compatibility using collection counts, including soft-deleted collections that remain restorable. Current visible empty collections alone do not prove the dataset is empty. Choose field types and queryability before sample ingestion; use a replacement dataset for incompatible changes to populated data. Refresh SDK dataset objects/descriptors and regenerate Go types after enum vocabulary updates. Dataset kind cannot change even when empty.
 
 Inspect collection counts before breaking changes:
 
@@ -295,12 +301,15 @@ tilebox dataset query <dataset-slug> --last 7d --limit 100 --cursor <next_cursor
 
 ```bash
 tilebox dataset get <dataset-slug> --json \
-  | jq '[.fields[] | select(.queryable == true) | {name, type, description, exampleValue}]'
+  | jq '[.fields[] | select(.queryable == true) | {name, type, repeated, enumValues, description, exampleValue}]'
 ```
 
 Map the user's intent to an exact queryable field and choose operators from its type. Do not invent field names or assume every schema field is queryable.
 
 - Strings support exact equality and `IS NULL` / `IS NOT NULL`; prefix, substring, pattern, and ordering comparisons are unsupported.
+- Scalar enums support `=` / `<>` with exact declared public strings and null checks; numeric literals and ordering comparisons are invalid.
+- Repeated enums support `A_CONTAINS(use_cases, ('agriculture', 'flood-monitoring'))` for all requested values and `A_OVERLAPS(use_cases, ('agriculture', 'forestry'))` for any. Single-string arguments also work. Use parentheses, not JSON brackets; empty request lists are unsupported in the CLI.
+- Repeated-enum membership treats missing/empty lists as empty sets and never returns null. Negated membership includes empty lists. Scalar comparisons and null checks are invalid for repeated enums.
 - Boolean fields support equality/inequality with `TRUE` or `FALSE` and null checks.
 - Numeric fields support `=`, `<>`, `<`, `<=`, `>`, and `>=`.
 - All comparisons, `NOT`, `AND`, and `OR` use SQL/CQL2 three-valued logic: comparisons against null or missing values are unknown, `NOT unknown` remains unknown, and only true results match.
@@ -399,6 +408,8 @@ data_including_missing = dataset.query(
 ```
 
 Use `field("name").is_null()` and `.is_not_null()` for null checks. A comparison against a null or missing field evaluates to unknown and is excluded, including `!=` and negated comparisons; explicitly OR with `.is_null()` to include it. The Python API builds a typed expression rather than parsing CQL2 text, and exposes a single `filter=` argument, so compose multiple conditions into one expression.
+
+For enums, use public strings: `(field("product_type") == "L2") & field("use_cases").contains("agriculture")`. Repeated enums also support `.contains_all([...])` and `.contains_any([...])`. Unlike scalar comparisons, membership never returns null; negation includes empty lists. Python returns a `list[str]` per repeated-enum row, not a padded array. See [Enum fields](reference/enum-fields.md) for ingestion, all/any examples, empty requests, and schema evolution.
 
 Python SDK queries return notebook-friendly xarray results and also support temporal extents, spatiotemporal geometry filters, automatic pagination, progress bars, and `skip_data=True` for fast existence/count probes.
 

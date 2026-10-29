@@ -124,6 +124,21 @@ point = {
 
 Do not add a nested `properties` mapping or represent message fields as dictionaries. Repeated message fields are lists of generated message instances.
 
+## Encode Schema-Local Enums
+
+For fields declared with `type: enum`, supply exact public strings, or lists of strings for repeated fields:
+
+```python
+point["product_type"] = "L2"
+point["use_cases"] = ["agriculture", "flood-monitoring"]
+```
+
+These values assume the dataset declares those vocabularies. The SDK maps strings to the server-assigned protobuf numbers; do not import legacy ProcessingLevel/SAR enum constants, invent numbers, or use generated symbols as values for custom enum fields. Validate provider strings against the recipe and preserve case and punctuation. Unknown values must fail or be quarantined pending an approved vocabulary update.
+
+Omit missing scalar values. For repeated enums, omitted and empty lists are equivalent; the backend deduplicates in first-occurrence order before storage and ID calculation. Reordering distinct members can change IDs, so follow the recipe's ordering policy. If duplicates carry meaning, a repeated enum is the wrong representation.
+
+Queries return scalar public strings and a `list[str]` per repeated-enum row in a one-dimensional xarray object column. Use `field("use_cases").contains(...)`, `.contains_all(...)`, or `.contains_any(...)` for server filtering. Refresh the dataset object after vocabulary updates. See [Enum fields](../../tilebox-datasets/reference/enum-fields.md) for complete query and round-trip contracts.
+
 ## Ingest By Collection
 
 Compute the approved collection route before ingestion and group points accordingly. Use the collection's SDK ingestion API:
