@@ -23,7 +23,11 @@ class ProcessScene(Task):
 - The default class-name identifier and `v0.0` are fine for prototypes.
 - Stable tasks define `identifier()` as a staticmethod or classmethod returning `(name, version)`, where version is `vX.Y`.
 - A runner at `v1.5` can execute a task submitted at `v1.3`, but not the reverse. Keep the major version for compatible fixes and bump it for breaking input or behavior changes.
-- Every task used by a submitted job must be registered with the runner, and submitter/runner identifiers must agree.
+- Every task used by a submitted job must be registered with the runner, and submitter/runner execution scope and identifiers must agree.
+
+Task definitions and release discovery remain unbound name/version pairs. Execution adds an optional workflow UUID; it does not use a project slug, reference string, or release ID as routing identity. Keep identifiers unchanged when copying a workflow. Compatible releases in the same workflow can serve queued tasks, but identical names in a different workflow cannot.
+
+Select scope for Python roots with `client.jobs().submit(name, task, workflow=reference_or_workflow)`. Omission/`None` is unscoped, and `"."` is not a Python local-project selector. Ordinary `context.submit_subtask(s)` inherits the executing parent's scope, including unscoped legacy-alias execution; a separate job submission does not. Read `context.current_task.identifier.workflow_id` for the current execution scope. The current public subtask APIs do not accept `workflow=`; do not invent cross-workflow or explicit-unscoped-child arguments. See the authoring skill's scope guidance and `tilebox-workflow-jobs` for submission examples.
 
 The complete serialized input for every root or submitted task is limited to **2048 bytes**, including all fields and values. Pass compact values, IDs, small configuration, cache keys, and object prefixes. Do not pass arrays, large GeoJSON, manifests, dataframes, xarray datasets, large binary payloads, thousands of URLs, credentials, clients, open files, or local paths. Put compact job-scoped bytes such as metadata or reduction summaries in `context.job_cache`; put large or durable payloads in object storage or Zarr and pass only a compact key. See [state and artifacts](state-and-artifacts.md). Prefer typed fields and defaults to unstructured dictionaries.
 
@@ -124,7 +128,7 @@ class ProcessScenes(Task):
 - Use `max_retries` for flaky network, storage, and provider operations whose effects are retry-safe.
 - Prefer simple stage barriers over thousands of pairwise dependency shapes. Long chains and `B[i]` depending only on `A[i]` at large fanout create expensive fine-grained DAGs; use orchestrator/stage tasks and homogeneous batches instead.
 
-Tasks may retry after a corrected release reaches the same cluster. Make execution re-entrant: derive deterministic output keys from inputs, use overwrite-safe writes, validate existing outputs, or commit atomically. External records and notifications need idempotency keys or deduplication. Retrying an old job uses its original inputs, so preserve input compatibility and avoid radically changing the expected graph. A compatible fix keeps the identifier major version and may bump the minor version; a major bump cannot repair already-submitted tasks.
+Tasks may retry after a corrected release of the same workflow reaches the same cluster. Make execution re-entrant: derive deterministic output keys from inputs, use overwrite-safe writes, validate existing outputs, or commit atomically. External records and notifications need idempotency keys or deduplication. Retrying an old job uses its original inputs and scope, so preserve input compatibility and avoid radically changing the expected graph. A compatible fix keeps the identifier major version and may bump the minor version; a major bump or a new workflow UUID cannot repair already-submitted tasks.
 
 ## Displays And Progress
 
@@ -182,17 +186,29 @@ Use `logger.bind(...)` for fields shared by several records. Call `logger.except
 
 ## Registration And Runner Modes
 
-Register every reachable task class:
+For a release-based project, expose a `Runner` object without connecting or starting it at import time:
+
+```python
+from tilebox.workflows import Runner
+
+runner = Runner(tasks=[ProcessScenes, ProcessScene, PublishSummary])
+```
+
+The managed CLI runner binds those definitions to the deployed workflow's UUID and optional legacy aliases. Use `tilebox-workflow-releases` for build/deploy and `tilebox runner start`; submit with explicit scope using `tilebox-workflow-jobs`.
+
+Use a direct Python runner only when explicitly requested or when executing a Python script as a direct runner for testing. Its root submissions must be unscoped; this is the only exception to always scoping workflow-project jobs. A script that only submits jobs, or a local managed CLI runner, does not qualify.
 
 ```python
 from tilebox.workflows import Client
 
 client = Client(name="example-runner")
-runner = client.runner(tasks=[ProcessScenes, ProcessScene, PublishSummary])
-runner.run_forever()
+# Direct-runner test only: deliberately omit workflow= so this runner can claim it.
+client.jobs().submit("direct-runner-test", ProcessScenes(["S2A_001", "S2B_002"]))
+connected_runner = runner.connect_to(client)
+connected_runner.run_all()
 ```
 
-Use `runner.run_all()` in notebooks or scripts that should drain currently available work and return. Use `runner.run_forever()` for a long-running runner process. Project initialization, release build/deployment, runner configuration, and job submission/operations belong to the companion release and jobs skills.
+`run_all()` drains available work and returns; `run_forever()` keeps polling. Current `Runner.connect_to` and `client.runner` do not accept a workflow selector and do not read local links. Do not pair an unscoped direct runner with scoped roots and expect them to execute; use the managed deployment path for scoped projects.
 
 ## Proven Public Example Patterns
 

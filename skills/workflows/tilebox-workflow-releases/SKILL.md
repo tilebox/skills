@@ -1,8 +1,8 @@
 ---
 name: tilebox-workflow-releases
-description: "Initializes, configures, builds, publishes, deploys, undeploys, and locally tests Tilebox workflow projects and releases with tilebox.workflow.toml and dynamic runners. Use when scaffolding workflow projects, iterating on workflow code, release artifacts, deployment targets, cluster runners, or completing an implicit Earth observation project routed to Tilebox."
+description: "Initializes local Tilebox workflow projects, discovers and adapts owned/shared templates, links checkouts to remote workflows, and builds, publishes, deploys, and tests releases. Use for workflow init --template, cloned or unlinked projects, tilebox.workflow.toml, release artifacts, deployment targets, dynamic runners, or completing an implicit Earth observation project."
 license: MIT
-compatibility: Requires the tilebox CLI, uv on PATH for workflow init/releases and `tilebox runner start`, and a Tilebox API Key ($TILEBOX_API_KEY) or `--api-key`.
+compatibility: Requires a current tilebox CLI and uv for scaffold dependency sync, release validation, and runners. Plain local init needs no API key; remote operations, linking, and template downloads require Tilebox authentication.
 metadata:
   author: tilebox
 ---
@@ -11,16 +11,20 @@ metadata:
 
 Use this skill to initialize workflow projects, turn workflow code changes into immutable releases, and deploy those releases to one or more Tilebox clusters. Use `tilebox-workflow-authoring` for task code and this skill for project scaffold, config, publish, deploy, and runner iteration.
 
+Use `tilebox-cli` first to ensure the CLI is up to date and inspect command schemas. The scoped-project release baseline is CLI >=0.14 and Tilebox Python packages >=0.68; check availability and installed capabilities rather than assuming these releases are already available. Regularly check and update project packages using authoring's `reference/tilebox/dependencies-and-packaging.md`, especially after cloning, copying a template, or resuming an older project.
+
+Always submit workflow-scoped jobs for these projects, including development and smoke tests: use `--workflow .` or an exact remote reference. Running `tilebox runner start` locally still requires scoped jobs. Unscoped submissions are only for an explicitly requested direct Python runner or a Python script executed as a direct runner for testing; follow `tilebox-workflow-jobs` for that exception. Missing links or deployments are prerequisites to resolve, not reasons to drop scope.
+
 ## Agent Release Loop
 
 For routine iteration, do the smallest safe loop:
 
-1. For a new project, choose a reusable capability name using the policy below, then initialize once with `tilebox workflow init --name "Scene QA" --json` before creating project files by hand. Omit `--name` only when the current directory already has an appropriate capability-based name.
+1. Inspect the existing project and local link. For a new project, discover a named source workflow when the user asks to adapt one, then use `init --template`; otherwise initialize the embedded scaffold. Resolve an unlinked checkout before publishing using the linking policy below.
 2. Edit workflow code and ensure changed files are covered by `[build].include` and not excluded.
-3. Optional local verification: `tilebox workflow build-release --debug --json`.
+3. Optional local verification: `tilebox workflow build-release --json`.
 4. Publish: `tilebox workflow publish-release --json`.
 5. Deploy the new release. For quick first results, omit `--cluster` to use the API default cluster instead of asking the user to choose one.
-6. If the user requested an actual processed artifact, use `tilebox-workflow-jobs` to submit and verify a representative job after deployment; deployment alone does not create the artifact.
+6. If the user requested an actual processed artifact, use `tilebox-workflow-jobs` to submit with `--workflow .` and verify a representative job after deployment; deployment alone does not create the artifact.
 7. If no compatible runner is active and local execution is appropriate, start a dynamic runner for the same cluster; omitting `--cluster` also uses the API default cluster.
 
 Prefer a specific release ID for production-like targets; use `--latest` for dev iteration only when that is acceptable.
@@ -29,7 +33,7 @@ For failed existing jobs caused by a compatible task bug, prefer deploying the f
 
 ## Deployment Intent For Implicit Geospatial Projects
 
-When the `tilebox` router accepts an implementation-oriented Earth observation or geospatial prompt through its implicit project route, treat that prompt as authorization to initialize the remote workflow, publish a release, and deploy it to a non-production destination unless the user limits the scope.
+When the `tilebox` router accepts an implementation-oriented Earth observation or geospatial prompt through its implicit project route, local initialization is the first step. Treat remote creation, publication, and deployment as separate effects; perform them within the user's authorization and the host agent's approval rules.
 
 Apply these boundaries:
 
@@ -68,60 +72,96 @@ Do not use `vienna-seasonal-timelapse`: `vienna` is an AOI value and `seasonal` 
 
 For a new Python workflow project, run `tilebox workflow init` before creating `pyproject.toml`, `tilebox.workflow.toml`, `runner.py`, source packages, or tests. Do not hand-write the initial workflow project scaffold.
 
-`tilebox workflow init` creates the server-side workflow, writes the API-returned slug into `tilebox.workflow.toml`, scaffolds the local project files, adds the `tilebox` Python dependency, and runs `uv sync` so the project is ready for `build-release`, `publish-release`, `deploy-release`, job submission, and local release-runner testing. It does not add task-specific optional libraries such as ODC Geo, Shapely, Rasterio, or async-geotiff; declare every package imported by authored workflow code and rerun `uv sync`.
-
-Initialization deliberately starts with a minimal `runner.py`. It is a scaffold, not a recommendation to keep all workflow code in one file. For non-trivial workflows, follow `tilebox-workflow-authoring` to move tasks and processing into coherent package modules while keeping the runner entrypoint limited to task registration and runner-level configuration. Update `[workflow].runner` if the entrypoint moves, and ensure `[build].include` contains the full package tree.
-
-`uv` is required on `PATH` for workflow initialization, release build/publish validation, and `tilebox runner start`. If `uv` is missing, fix the `uv` installation first, then rerun `tilebox workflow init`. Do not fall back to manual scaffolding just because `uv` is not initially available.
-
-```bash
-tilebox workflow init --json
-```
-
-Provide the reusable capability name explicitly when the directory name is not already the name you want agents and users to see:
-
 ```bash
 tilebox workflow init --name "Scene QA" --json
+tilebox workflow init ./scene-qa --name "Scene QA" --description "Processes scenes" --json
 ```
 
-Init semantics from the CLI implementation:
+Plain init is local: it writes the scaffold, declares `tilebox-datasets>=0.68` and `tilebox-workflows>=0.68`, runs `uv sync`, and records new-workflow intent. It neither creates a remote workflow nor needs API credentials. The default destination is the current directory. `--name` derives the portable project slug; omit it only when the directory already has a suitable capability name. Init refuses to overwrite existing scaffold files.
 
-- Initializes the current directory only.
-- Aborts if any of `tilebox.workflow.toml`, `pyproject.toml`, `runner.py`, or `uv.lock` already exists.
-- Requires `uv` on `PATH`.
-- Derives the local project slug from `--name` when provided; otherwise from the current directory name.
-- Slugifies the project name and truncates it to at most 40 characters, preferring whole-word boundaries.
-- Creates the remote Tilebox workflow and writes the API-returned workflow slug to `tilebox.workflow.toml`.
-- Scaffolds `tilebox.workflow.toml`, `pyproject.toml`, and `runner.py`.
-- Adds `tilebox` as a `pyproject.toml` dependency.
-- Runs `uv sync`, which creates `uv.lock` and the local environment.
+Initialization starts with a minimal `runner.py`. For non-trivial workflows, follow `tilebox-workflow-authoring` to group tasks and processing into coherent modules, leaving registration and runner configuration in the entrypoint. Include the full package tree in the build. Declare optional libraries imported by the code and rerun `uv sync`.
 
-Before relying on output fields in automation, refresh the schema with:
+Plain init needs `uv` on `PATH`. Fix a missing installation rather than hand-scaffolding. Template init is different: it downloads files without installing dependencies or executing source.
+
+### Local Project And Remote Identity
+
+Keep these identities separate:
+
+| Identity | Meaning |
+| --- | --- |
+| `[workflow].slug` in `tilebox.workflow.toml` | Portable, non-unique project slug. Commit it with code; it is not a remote destination. Optional `name` and `description` supply first-publish metadata. |
+| Remote workflow `reference` | Address returned by the API, possibly with a suffix; shared references include a namespace, such as `tilebox:example`. Never reconstruct it from the project slug or display name. |
+| Remote workflow `id` | Immutable UUID used to scope task execution across releases. |
+| `.tilebox/workflows.json` | Checkout-local destination state beside the TOML, keyed by project slug. Keep it ignored, not in Git or release artifacts. |
+
+Local state has three meanings: `intent: "new"` allows first publish to create a workflow; a saved `organizationSlug`/`workflowReference` selects an existing workflow; no entry means unlinked. An optional `apiUrl` records a non-default endpoint. Let CLI commands manage this file; do not copy a colleague's state, hand-edit a destination, or delete a link to request a fork. There is one destination per project slug per checkout.
+
+The CLI finds the nearest TOML by searching the current/given directory and parents. Remote project operations validate the link against the active organization and API. New intent cannot be used by `get`, deploy, or scoped submission before first publication. A missing/inaccessible saved workflow fails rather than creating a replacement or submitting unscoped work.
+
+Init JSON contains `directory` and `project_slug`; `workflow_slug` is only present when linked, not for a fresh project. Workflow get/list/create output uses `reference`, not the old `slug` field. Inspect each command with `agent-context ... --output-schema` before parsing it.
+
+## Adapt An Owned Or Shared Workflow
+
+For “Adapt the seasonal RGB time-lapse workflow,” search existing workflows before writing a replacement. Inspect both owned and shared catalogs; use names, summaries, descriptions, and project slugs to find candidates, then inspect their releases and task/input contract. An exact reference supplied by the user can be inspected directly.
 
 ```bash
-tilebox agent-context workflow init --output-schema
+tilebox workflow list --limit 100 --json
+tilebox workflow list --shared --limit 100 --json
+tilebox workflow get <source-reference> --json
 ```
 
-## Bind An Existing Or Manual Workflow Project
-
-Use this path only when one of these is true:
-
-- the directory is an existing workflow/codebase that cannot be initialized cleanly;
-- the user explicitly asks to bind an existing Tilebox workflow slug;
-- `tilebox workflow init` was attempted, the failure was diagnosed, and manual binding is the smallest safe recovery.
-
-Do not use `tilebox workflow create` as the first step for a new project. For new projects, use `tilebox workflow init`, then evolve the generated files.
-
-For an existing or manual workflow project, create the server-side workflow manually, then write or update `tilebox.workflow.toml` in the project root. The CLI searches upward from the current directory for the nearest config file, so commands work from subdirectories.
+Page each catalog through `next_cursor`, preserving `--shared` where applicable. Use the exact returned `reference`, including namespace/suffix. Do not invent `tilebox:seasonal-rgb…`, assume a specific public slug exists, or conclude absence from the first page. If several plausible candidates remain, present the differences and ask which source the user means. If none is found, distinguish no match from missing authentication/access before offering a fresh implementation.
 
 ```bash
-WORKFLOW_SLUG=$(tilebox workflow create "Scene QA" \
-  --description "Processes new scenes" \
-  --json | jq -r '.slug')
+# SOURCE_REFERENCE is the exact owned or shared reference discovered above.
+tilebox workflow init ./rgb-timelapse --template "$SOURCE_REFERENCE" --name "RGB Timelapse" --json
+```
 
-cat > tilebox.workflow.toml <<EOF
+Template init copies the latest published release into an independent local project with new intent. It never links the copy to the source, updates the source, publishes, or deploys. It preserves source/package/task names, dependencies, and `uv.lock`; it reconstructs build rules and runner configuration from release metadata with root `"."`, without copying deployment targets. Scope isolates the eventual copy, so do not rename task identifiers to avoid collisions.
+
+Without a destination, template init uses the source project slug or a slug derived from `--name`. An explicit destination, including `.`, must be absent or empty. A different directory alone does not rename the project. `--name`/`--description` customize the new project; `--template` cannot be combined with `--slug`. There is no template release-selection flag: record the returned source reference, release ID, and artifact digest when reporting what was copied.
+
+Review downloaded code, dependencies, build rules, and storage/output defaults before `uv sync`, imports, or release validation. Then check/update Tilebox dependencies, adapt the code, build, and publish/deploy within authorization. Template init does not upgrade dependencies. If the source has no usable published release or download validation fails, report that cause; do not silently use another template or a blank scaffold.
+
+## Link An Existing Or Cloned Project
+
+`workflow link` selects an existing owned remote workflow without changing source, TOML metadata, remote metadata, or deployment. It does not download that workflow's code.
+
+```bash
+tilebox workflow link <owned-reference> --json
+# Only when deliberately changing an existing destination:
+tilebox workflow link <other-owned-reference> --replace --json
+```
+
+Repeated linking to the same destination is safe. Replacing new intent with an existing destination does not need `--replace`; changing a saved destination, organization, or API does. Shared workflows may be template sources or explicit execution targets, but cannot be linked as publishing destinations unless owned by the active organization. `init --slug <owned-reference>` scaffolds and links a new directory; it does not copy that remote workflow's implementation.
+
+### Publishing A Colleague's Checkout
+
+A Git clone normally lacks the ignored link file. Before publishing:
+
+1. Inspect the nearest TOML, local state, and active account (`tilebox account get --json`). Preserve valid links and explicit new intent.
+2. If unlinked, list owned workflows with pagination. Compare the portable project slug, name, description, repository context, and release task/build metadata. These identify candidates, not proof of ownership or identity.
+3. If the user supplied an unambiguous destination, link it. Otherwise explain the likely match(es) and ask whether to update one or create an independent workflow. A generic “publish this clone” is not a reason to silently create a duplicate or choose a name match.
+4. For an existing destination, run `workflow link <reference>`, inspect `workflow get`, then publish. For an explicitly chosen independent destination, use `workflow create` followed by `workflow link` as below; keep the existing project/source intact.
+
+```bash
+WORKFLOW_REFERENCE=$(tilebox workflow create "Scene QA" \
+  --description "Processes new scenes" --json | jq -er '.reference')
+tilebox workflow link "$WORKFLOW_REFERENCE" --json
+```
+
+Creation is a remote write; get authorization for that choice first. Do not rerun init over an existing project, replace its portable slug with a remote reference, fabricate `intent: "new"`, or assume an `unlink` command exists. If a link is stale or belongs to another organization/API, resolve that mismatch explicitly before `--replace`.
+
+The CLI temporarily auto-links unlinked legacy projects only when the TOML slug exactly equals an existing remote reference (including suffix). Do not use that compatibility path as the agent's matching policy; check the intended destination before invoking a command that could auto-link.
+
+## Project Configuration
+
+For an existing project, preserve its portable slug and edit its build/runner configuration as needed. This example is a shape reference, not a command to overwrite an existing config:
+
+```toml
 [workflow]
-slug = "$WORKFLOW_SLUG"
+slug = "scene-qa"
+name = "Scene QA"
 root = "."
 runner = "scene_qa.runner:runner"
 
@@ -144,19 +184,18 @@ clusters = ["dev-cluster"]
 
 [targets.production]
 clusters = ["prod-a", "prod-b"]
-EOF
 ```
 
 Config rules from the CLI implementation:
 
 - File name must be `tilebox.workflow.toml`.
-- `[workflow].slug` is required.
+- `[workflow].slug` is required and remains portable; optional `name` and `description` are creation metadata, not instructions to update a linked workflow.
 - `[workflow].root` is optional and defaults to `"."`; all build paths are relative to that root.
 - Set exactly one of:
   - `runner = "module:object"`, which runs as `uv run python -m tilebox.workflows.runner module:object`.
   - `command = ["uv", "run", "python", "-m", "my_workflow.worker"]`, a custom worker process command.
 - `[build].include` is required and must include at least one pattern.
-- `[build].exclude` is optional. The artifact also excludes the generated `<workflow-slug>.tar.zst` archive automatically.
+- `[build].exclude` is optional. Builds always exclude `.git`, `.tilebox`, `.venv`, and `.tilebox-artifact` at any depth, case-insensitively, plus the generated archive. Still exclude secrets, downloaded data, and large assets explicitly.
 - `[build].use_gitignore` defaults to `true`.
 - `[targets.<name>].clusters` defines a reusable list of cluster slugs. Use either `--target` or `--cluster`, not both.
 - Unknown TOML keys fail config loading; keep the shape exact.
@@ -180,8 +219,10 @@ runner = Runner(tasks=[SceneQA, SomeSubtask], cache=LocalFileSystemCache())
 Workflow release commands that validate or run the Python worker runtime require `uv` on `PATH`, including `tilebox workflow build-release` and `tilebox workflow publish-release`. If `uv` is missing, install or fix `uv` before retrying the release command.
 
 ```bash
-tilebox workflow build-release --debug --json
+tilebox workflow build-release --json
 ```
+
+For CLI diagnostics, set `TILEBOX_DEBUG=1`; build/publish no longer accept `--debug`. This is separate from workflow task log severity.
 
 The build command:
 
@@ -269,12 +310,14 @@ If `uv sync` or release validation fails on a runner, check whether the lockfile
 
 ## Publish A Release
 
-Publishing validates the project, uploads the artifact if needed, and creates an immutable workflow release. It is idempotent for identical release content and artifact digest: the CLI returns the existing release instead of creating a duplicate.
+Publishing builds and validates first. For new intent it then creates a scoped-only remote workflow, saves the returned reference in the local link, uploads the artifact, and publishes an immutable release. For a linked project it reuses the validated destination. Local build alone never creates a workflow.
+
+Identical release content and artifact digest are idempotent within the destination workflow. Remote workflow creation is not guaranteed exactly once: after an ambiguous creation/network failure, inspect owned workflows and recover with `workflow link <reference>` before retrying. Once the link is saved, upload/publication retries reuse it. Do not delete it to retry. TOML name/description changes do not rename an already linked remote workflow.
 
 Publishing requires `uv` on `PATH` because it builds and validates the Python workflow runtime before upload.
 
 ```bash
-RELEASE_ID=$(tilebox workflow publish-release --debug --json | tee /tmp/workflow-release.json | jq -r '.id')
+RELEASE_ID=$(tilebox workflow publish-release --json | tee /tmp/workflow-release.json | jq -r '.id')
 jq '{id, message, fingerprint, tasks, files}' /tmp/workflow-release.json
 ```
 
@@ -298,7 +341,7 @@ Use this pattern:
 
 1. Fix the task implementation.
 2. Keep the task identifier unchanged and use a compatible version. For backward-compatible fixes, bump the minor version; a runner with `v1.5` can execute a task submitted as `v1.3`.
-3. Publish and deploy the new workflow release to the same cluster as the failed job.
+3. Publish and deploy the new release to the same workflow and cluster as the failed job. A new workflow UUID cannot serve the old workflow's queued tasks even with identical task names.
 4. Retry the failed job.
 
 ```bash
@@ -317,7 +360,7 @@ tilebox agent-context job retry --output-schema
 
 ## Deploy Or Undeploy Releases
 
-Deploy maps a workflow release to clusters. It does not submit jobs by itself. Omit `--workflow` when running inside a project with `tilebox.workflow.toml`; the CLI uses `[workflow].slug`.
+Deploy maps a workflow release to clusters. It does not submit jobs by itself. Omit `--workflow` inside a linked project to use its saved destination, not the portable TOML slug. Outside the project, pass the exact remote reference. A shared workflow can be deployed by explicit reference without linking your source project to it.
 
 Deploy the release you just published:
 
@@ -337,22 +380,22 @@ Deploy a specific release to multiple explicit clusters:
 
 ```bash
 tilebox workflow deploy-release \
-  --workflow "$WORKFLOW_SLUG" \
+  --workflow "$WORKFLOW_REFERENCE" \
   --release "$RELEASE_ID" \
   --cluster cluster-a,cluster-b \
   --json
 ```
 
-Undeploy uses the same selector rules and removes the active release mapping:
+Undeploy removes the workflow's active mapping on the selected clusters. Omitting `--release` removes whichever release is deployed there; supplying it selects a specific release:
 
 ```bash
-tilebox workflow undeploy-release --latest --target dev --json
+tilebox workflow undeploy-release --target dev --json
 tilebox workflow undeploy-release --release "$RELEASE_ID" --cluster cluster-a --json
 ```
 
 Selector rules:
 
-- Pass exactly one of `--release <uuid>` or `--latest`.
+- Deploy requires exactly one of `--release <uuid>` or `--latest`. Undeploy accepts optional `--release` and has no `--latest` flag.
 - `--release` must be a UUID.
 - `--target <name>` requires a local `tilebox.workflow.toml` and must exist in `[targets]`.
 - `--cluster` is comma-separated and cannot be combined with `--target`.
@@ -362,7 +405,7 @@ Inspect state:
 
 ```bash
 tilebox workflow get --json
-tilebox workflow get "$WORKFLOW_SLUG" --json
+tilebox workflow get "$WORKFLOW_REFERENCE" --json
 tilebox cluster get dev-cluster --json
 ```
 
@@ -375,13 +418,13 @@ A dynamic runner executes tasks for releases deployed to a cluster. It polls clu
 Terminal 1:
 
 ```bash
-tilebox runner start --cluster dev-cluster --debug
+tilebox runner start --cluster dev-cluster --log-level debug
 ```
 
 Use the API default cluster by omitting `--cluster`:
 
 ```bash
-tilebox runner start --debug
+tilebox runner start --log-level debug
 ```
 
 Quiet console logs while still exporting Tilebox logs:
@@ -394,11 +437,12 @@ Terminal 2, after deploying a release to the same cluster, submit a root task:
 
 ```bash
 tilebox job submit \
+  --workflow . \
   --name scene-qa-test \
   --task tilebox.com/example/SceneQA \
   --version v1.0 \
   --cluster dev-cluster \
-  --input '{"scene_id":"S2A_001"}' \
+  --input S2A_001 \
   --wait \
   --json
 ```
@@ -408,7 +452,9 @@ Runner notes for debugging:
 - With no deployed workflows, the runner idles locally and logs a warning.
 - Deployment changes are picked up by polling, roughly every 10 seconds plus jitter.
 - Invalid deployed releases are skipped while valid releases remain runnable.
-- If two deployed releases expose conflicting task identifiers, ambiguous releases are not advertised by the runner.
+- Upgrade managed runner CLIs as well as the submitting CLI before using scoped deployments. Releases contain unbound name/version pairs; the managed runner binds them to the deployment's workflow UUID without rewriting source or artifacts.
+- Different workflows may expose the same task name/major on one cluster. Two workflows exposing the same unscoped legacy alias still conflict; duplicate name/major pairs within one release are invalid even with different minors.
+- New CLI-created workflows are scoped-only. Existing workflows may retain `legacy_task_aliases` for old jobs/automations; do not remove legacy compatibility to fix an unrelated issue. If incompatible/ambiguous deployments are skipped, inspect runner logs rather than falling back to unscoped submission.
 - The runner handles interrupts: first interrupt stops claiming new tasks and tries graceful shutdown; a second interrupt exits quickly.
 
 ## Safe Automation Pattern

@@ -10,6 +10,30 @@ All runtime dependencies must be declared in `pyproject.toml` so `uv sync` can r
 - Keep local modules in the released source tree; publish/version reusable libraries or vendor a small stable helper.
 - Run `uv sync`, validate imports, and verify runner startup. Avoid heavy packages when a smaller library fits.
 
+## Keep Tilebox Packages Current
+
+Check versions when starting/resuming work, after cloning or template initialization, before relying on new APIs, and before publishing after substantial changes. Plain `uv sync` respects the existing lockfile; it does not upgrade locked packages. Template init preserves the source dependencies and lockfile unchanged.
+
+For scoped tasks and the local-project release, target `tilebox-workflows>=0.68` and the other Tilebox packages used by the project at >=0.68, alongside CLI >=0.14. Confirm those releases are available; these minimums describe the planned release baseline. Use current stable releases rather than pinning forever to the minimum. If unavailable, report the version blocker and use development/prerelease packages only when the user has selected them.
+
+Inspect `pyproject.toml`, `uv.lock`, and installed distributions. Check available updates without changing the environment:
+
+```bash
+uv pip list --python .venv/bin/python --outdated
+```
+
+Adjust the interpreter path for the project/OS. Update only the Tilebox packages already used, respecting intentional pins and constraints. For a project using workflows and datasets:
+
+```bash
+# If existing constraints do not yet allow the required baseline:
+uv add 'tilebox-workflows>=0.68' 'tilebox-datasets>=0.68'
+# Refresh locked versions even when existing constraints already allow them:
+uv lock --upgrade-package tilebox-workflows --upgrade-package tilebox-datasets
+uv sync
+```
+
+Include `--upgrade-package tilebox-storage` or the `tilebox` meta-package when present; do not add unused packages just to upgrade them. Inspect the resulting constraint/lock changes, resolve compatibility issues, run focused tests/import checks and release build validation, and keep the updated lockfile with the code. Do not broadly upgrade unrelated scientific dependencies or silently override a deliberate version pin. Updating your local environment does not update an already published release: publish and deploy a new release within authorization. Use `tilebox-cli` for CLI and managed-runner upgrades.
+
 ## No Editable Or Local Paths
 
 Development-machine paths are unavailable during release validation and runner startup. Do not use:
@@ -47,7 +71,7 @@ For example, source that imports ODC Geo and Shapely should declare both:
 
 ```toml
 dependencies = [
-  "tilebox>=0.59",
+  "tilebox-workflows>=0.68",
   "odc-geo>=0.5",
   "shapely>=2",
 ]

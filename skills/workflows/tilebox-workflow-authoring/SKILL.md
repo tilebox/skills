@@ -13,6 +13,8 @@ Create or modify Python workflow source code and local/runtime behavior. Keep pl
 
 ## Start With Current APIs And The Right Skill
 
+Always ensure `tilebox-cli` is up to date. Regularly check and update the project's Tilebox Python packages, especially after cloning, template initialization, or resuming old work; follow `reference/tilebox/dependencies-and-packaging.md`. The scoped-project release baseline is CLI >=0.14 and Python packages >=0.68; confirm availability and installed API support before using it.
+
 When an API is unclear or remembered behavior may be stale, inspect the installed version or search current docs:
 
 ```bash
@@ -23,13 +25,13 @@ tilebox docs search "caches job_cache"
 
 Delegate adjacent ownership:
 
-- `tilebox-workflow-releases`: project initialization, `pyproject.toml` scaffold, build, publish, deploy, and runner configuration.
+- `tilebox-workflow-releases`: local initialization, owned/shared template discovery, checkout linking, `pyproject.toml` scaffold, build, publish, deploy, and runner configuration.
 - `tilebox-workflow-jobs`: submit, wait, list, inspect, retry, cancel, and cluster operations.
 - `tilebox-datasets`: source/product recommendations, exact dataset slugs, provider credentials, auxiliary catalogues, and CLI inspection.
 - `tilebox-cli`: authentication, CLI discovery, JSON output, and docs search.
 - `tilebox-workflow-automations`: cron and storage-triggered automations.
 
-For a new project, use `tilebox workflow init` through `tilebox-workflow-releases`; do not hand-scaffold project configuration. Authoring may edit the generated code after initialization.
+For a new project, use `tilebox workflow init` through `tilebox-workflow-releases`; do not hand-scaffold project configuration. When asked to adapt a named workflow, discover it in owned/shared catalogs and use `workflow init --template <exact-reference>` before authoring. Review copied source before installing or executing it. Reuse an existing project rather than reinitializing it; a clone without local link state needs destination selection before publication, not a rewritten TOML slug.
 
 ## Plan Before Coding
 
@@ -104,6 +106,16 @@ class ProcessScene(Task):
 - Keep the initial version while iterating before rollout. Once compatibility matters, minor versions are forward-compatible; bump major for breaking input/behavior changes.
 - Keep the complete serialized input at most 2048 bytes. Pass compact plain-Python or supported library values, IDs, keys, and small configuration—not arrays, dataframes, xarray datasets, large geometry, manifests, credentials, clients, open files, or local paths. Use `context.job_cache` or durable storage according to `reference/tilebox/state-and-artifacts.md`.
 - Register every task class used by jobs with the runner.
+
+### Keep Task Definitions Independent Of Workflow Scope
+
+`identifier()` still returns only `(name, version)`. Release discovery contains these unbound definitions; execution adds the workflow UUID separately. Keep source identifiers when copying a template, including imported tasks. Do not encode the organization, remote reference, workflow UUID, or release ID into task names to isolate copies. Different scoped workflows can deploy the same name/major on one cluster; duplicate name/major pairs within a single release remain invalid.
+
+Always submit workflow-scoped roots when working with a workflow project: use CLI `--workflow .` or an exact remote reference; in Python use `client.jobs().submit(..., workflow=reference_or_workflow)`. The Python argument does not resolve local `.` links. The only exceptions are an explicitly requested direct Python runner or executing a Python script as a direct runner for testing; those require unscoped roots (omit Python's `workflow` argument or pass `None`). A submission-only script and a local `tilebox runner start` still require scope. Never use direct execution to bypass a failed project link or deployment. Follow `tilebox-workflow-jobs` for complete examples.
+
+`context.submit_subtask(s)` inherits the executing parent's scope through the SDK/runner. A parent invoked through a legacy unscoped alias therefore has unscoped children, even if its release belongs to a workflow. A separate `client.jobs().submit(...)` is a new root submission and needs its own explicit workflow. The backend does not infer child scope from a parent; inspect `context.current_task.identifier.workflow_id` when diagnosing execution.
+
+Do not invent `workflow=` parameters on `submit_subtask(s)` or `Runner.connect_to`: the current public Python methods do not expose those scope selectors. The backend supports cross-workflow children, but a managed-runner compatibility adapter fills omitted child scope from the parent, so an explicit unscoped-child override is not safely represented there. Check current SDK support before implementing cross-workflow orchestration; do not mutate private task metadata or silently substitute a separate job.
 
 ### Await Async IO Directly In Tasks
 
@@ -212,14 +224,14 @@ Declare runtime dependencies in `pyproject.toml`, including optional libraries w
 
 ## Verification Checklist
 
-1. All submitted tasks are registered and identifiers/versions agree.
+1. All submitted tasks are registered and identifiers/versions agree; release-based root submissions select the intended workflow and child execution retains that scope.
 2. Task fields use idiomatic Python or existing library value types rather than structurally duplicating them in custom dataclasses or ad hoc containers.
 3. Every serialized task input is at most 2048 bytes.
 4. Cross-task data uses the right state/artifact boundary and deterministic keys.
 5. Retryable execution is re-entrant and input-compatible.
 6. High-fanout tasks have labels, useful progress, structured logs, and spans where warranted.
 7. Dependencies sync and task modules import in the intended environment.
-8. For scaffolded release projects, `tilebox workflow build-release --debug --json` succeeds after editing generated task code.
+8. For scaffolded release projects, `tilebox workflow build-release --json` succeeds after editing generated task code.
 9. Non-trivial workflows use coherent package modules and keep the runner entrypoint limited to registration and runner-level configuration.
 10. Substantive underlying processing functions have focused tests where useful; Tilebox task orchestration is verified through build/task discovery and a representative job rather than task-class unit tests.
 11. Earth observation outputs have representative scientific validation, coverage/alignment checks, provenance, and stated limitations.
