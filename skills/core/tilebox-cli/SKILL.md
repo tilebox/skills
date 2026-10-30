@@ -12,7 +12,9 @@ Use this skill whenever interacting with the `tilebox` command-line tool. Prefer
 
 ## Core Rules For Agents
 
+- Always ensure the CLI is up to date before relying on workflow behavior: check `tilebox --version`, follow Updating The CLI below, then refresh command schemas. Do not treat these skills as evidence that an older binary supports a new flag.
 - Always pass `--json` in agent workflows when the command supports it; never pass `--interactive`.
+- Always submit workflow-project jobs with `--workflow .` or an exact remote reference, including local managed-runner tests. Only use unscoped jobs for an explicitly requested direct Python runner or a Python script executed as a direct runner for testing; see `tilebox-workflow-jobs`.
 - Use `tilebox agent-context <command path> --output-schema` before relying on a command's output shape.
 - Pass authentication via `TILEBOX_API_KEY` unless the user explicitly asks to use `--api-key`.
 - Use `--api-url` only when targeting a non-default API environment.
@@ -66,10 +68,13 @@ Examples:
 tilebox dataset list --json | jq '[.[].slug]'
 
 # Extract a submitted job ID
-JOB_ID=$(tilebox job submit --name <job-name> --task <task-name> --input '{}' --json | jq -r '.id')
+JOB_ID=$(tilebox job submit --workflow . --name <job-name> --task <task-name> --input '{}' --json | jq -r '.id')
 
-# Initialize a workflow project and extract its server-side workflow slug
-WORKFLOW_SLUG=$(tilebox workflow init --name "Scene QA" --json | jq -r '.workflow_slug')
+# Initialize locally; a fresh project has no remote workflow reference yet
+PROJECT_SLUG=$(tilebox workflow init --name "Scene QA" --json | jq -er '.project_slug')
+
+# After first publication or explicit linking, resolve the remote reference
+WORKFLOW_REFERENCE=$(tilebox workflow get --json | jq -er '.reference')
 
 # Inspect failed jobs from a query response
 tilebox job list --last 7d --state failed --json | jq '{jobs: [.jobs[] | {id, state, name}]}'
@@ -77,8 +82,8 @@ tilebox job list --last 7d --state failed --json | jq '{jobs: [.jobs[] | {id, st
 # Page through commands manually by reading next_cursor
 tilebox job logs <job-id> --limit 100 --json | jq -r '.next_cursor'
 
-# Read automation storage location IDs and locations
-tilebox automation storage-locations --json | jq '{storage_locations: [.storage_locations[] | {id, type, location}]}'
+# Read storage location IDs and typed provider references
+tilebox storage-location list --json | jq '{storage_locations: [.storage_locations[] | {id, name, reference}]}'
 ```
 
 Use `jq -e` when a script should fail if a required value is missing:
@@ -164,10 +169,10 @@ The CLI installer downloads a released binary, verifies checksums, and installs 
 curl -fsSL https://install.tilebox.com/cli.sh | TILEBOX_INSTALL_DIR="$HOME/bin" sh
 ```
 
-Install a specific version:
+Install a specific version only when intentionally pinned; set `VERSION` to the selected available release:
 
 ```bash
-curl -fsSL https://install.tilebox.com/cli.sh | TILEBOX_VERSION=0.3.1 sh
+curl -fsSL https://install.tilebox.com/cli.sh | TILEBOX_VERSION="$VERSION" sh
 ```
 
 Ensure the install directory is on `PATH`, set `TILEBOX_API_KEY`, then verify the installation and authentication:
@@ -178,16 +183,22 @@ tilebox account get --json
 
 ## Updating The CLI
 
-Use the built-in upgrade command for released binaries installed on `PATH`:
+Check `tilebox --version` at the start of a task. Keep released binaries current with the built-in upgrade command, then check the version again and refresh `agent-context`:
 
 ```bash
+tilebox --version
 tilebox upgrade --json
+tilebox --version
 ```
 
-Install a specific release:
+For scoped tasks, local project linking, and template initialization, target CLI >=0.14 and Tilebox Python packages >=0.68. These are the planned release baseline, not a claim that those versions are already published. Check the latest available release and installed command schemas. If the required release/feature is unavailable, report the blocker; do not silently fall back to remote-creating init, guessed links, or unscoped submission. Use a prerelease or development build only when the user has selected that channel.
+
+Respect deliberately pinned installations and managed environments: explain the required upgrade before changing their policy. Upgrade runner machines too; upgrading the submitter alone does not update running managed runners. Within workflow projects, regularly check and update the Tilebox Python dependencies and lockfile using `tilebox-workflow-authoring`'s dependency guidance, not just the CLI.
+
+Install an intentionally selected release (`VERSION` must satisfy the project's requirements):
 
 ```bash
-tilebox upgrade --version 0.3.1 --json
+tilebox upgrade --version "$VERSION" --json
 ```
 
 Force reinstall:
@@ -209,12 +220,13 @@ The current CLI exposes these top-level command families. Run `tilebox agent-con
 | Family | Purpose | Useful Commands |
 | --- | --- | --- |
 | `account` | Inspect the active account, usage overages, and subscription tier. | `tilebox account get`, `tilebox account subscription`, `tilebox account usage`, `tilebox whoami` |
-| `automation` | Inspect workflow automations and storage locations. | `tilebox automation list`, `tilebox automation get <automation-id>`, `tilebox automation storage-locations` |
+| `automation` | Inspect and manage persistent automations. | `tilebox automation list`, `tilebox automation get <automation-id>`, `tilebox automation create`, `tilebox automation update <automation-id>`, `tilebox automation delete <automation-id>` |
+| `storage-location` | Inspect storage locations used by automation triggers. | `tilebox storage-location list`, `tilebox storage-location get <storage-location-id>` |
 | `cluster` | Manage workflow compute clusters. | `tilebox cluster list`, `tilebox cluster get <cluster-slug>`, `tilebox cluster create <name>`, `tilebox cluster delete <cluster-slug>` |
 | `dataset` | Create, update, inspect, query, find datapoints, and generate types for datasets. | `tilebox dataset list`, `tilebox dataset get <dataset-slug>`, `tilebox dataset create`, `tilebox dataset update <dataset-slug>`, `tilebox dataset query <dataset-slug>`, `tilebox dataset find <dataset-slug> <datapoint-id>`, `tilebox dataset generate --slug <dataset-slug>` |
 | `dataset collection` | Manage collections within a dataset. | `tilebox dataset collection list --dataset <dataset-slug>`, `tilebox dataset collection get <name> --dataset <dataset-slug>`, `tilebox dataset collection create <name> --dataset <dataset-slug>`, `tilebox dataset collection delete <name> --dataset <dataset-slug>` |
 | `job` | Submit, monitor, debug, retry, wait for, and cancel workflow jobs. | `tilebox job submit`, `tilebox job list`, `tilebox job get <job-id>`, `tilebox job wait <job-id>`, `tilebox job retry <job-id>`, `tilebox job cancel <job-id>`, `tilebox job logs <job-id>`, `tilebox job spans <job-id>` |
-| `workflow` | Initialize, create, inspect, build, publish, deploy, and undeploy workflow releases. | `tilebox workflow init`, `tilebox workflow create`, `tilebox workflow list`, `tilebox workflow get`, `tilebox workflow build-release`, `tilebox workflow publish-release`, `tilebox workflow deploy-release`, `tilebox workflow undeploy-release` |
+| `workflow` | Initialize local projects, copy templates, link remote destinations, and release workflows. | `tilebox workflow init`, `tilebox workflow init --template <reference>`, `tilebox workflow link <reference>`, `tilebox workflow create`, `tilebox workflow list`, `tilebox workflow get`, `tilebox workflow build-release`, `tilebox workflow publish-release`, `tilebox workflow deploy-release`, `tilebox workflow undeploy-release` |
 | `docs` | Search Tilebox documentation from the CLI. | `tilebox docs search "<query>"` |
 | `parallel` | Run a shell command multiple times in parallel. | `tilebox parallel -n <count> -- <command> [args...]` |
 | `upgrade` | Upgrade or reinstall the Tilebox CLI. | `tilebox upgrade`, `tilebox upgrade --version <version>`, `tilebox upgrade --force` |

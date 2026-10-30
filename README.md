@@ -48,9 +48,9 @@ Install `core`, `datasets`, and `workflows` for implicit Earth observation proje
 | Skill | Purpose | When to Use |
 | --- | --- | --- |
 | `tilebox-workflow-authoring` | Write Python Tilebox workflow code for task graphs, datasets, storage, observability, and Earth observation or geospatial processing | Any task creating or modifying Tilebox workflow source code, including implicit imagery, monitoring, classification, change-detection, or object-detection requests |
-| `tilebox-workflow-releases` | Initialize, configure, release, and deploy Tilebox workflows with `tilebox workflow init`, `tilebox.workflow.toml`, build/publish commands, deployment targets, clusters, and dynamic runners | Any task involving workflow project scaffolding, config, build verification, release publishing, cluster deployment, undeployment, local runner testing, or completion of an implicit geospatial project |
+| `tilebox-workflow-releases` | Initialize local projects, discover owned/shared templates, link remote workflows, and build/publish/deploy releases | Adapting an existing workflow, `workflow init --template`, cloned/unlinked projects, config, release publishing, deployment targets, clusters, and dynamic runners |
 | `tilebox-workflow-jobs` | Manage workflow jobs with `tilebox job`: submit, list, inspect, wait, logs, spans, retry, and cancel | Any task involving workflow job operations, debugging, or root task submission |
-| `tilebox-workflow-automations` | Work with workflow automations: list, inspect, storage locations, and one-off cron/storage trigger submissions | Any task involving Tilebox automations, automation triggers, or `CronTask` / `StorageEventTask` submissions |
+| `tilebox-workflow-automations` | Create, update, pause, delete, and inspect scoped automations; submit one-off cron/storage triggers | Persistent automations, task scope, storage locations, or `CronTask` / `StorageEventTask` submissions |
 
 ## Quick Start
 
@@ -72,6 +72,8 @@ Install `core`, `datasets`, and `workflows` for implicit Earth observation proje
 | "Get logs and spans for this workflow job" | `tilebox-workflow-jobs` |
 | "Retry failed tasks for this job" | `tilebox-workflow-jobs` |
 | "Initialize a new Tilebox workflow project" | `tilebox-workflow-releases` |
+| "Adapt the seasonal RGB time-lapse workflow" | `tilebox-workflow-releases` for owned/shared discovery and template init, then `tilebox-workflow-authoring` |
+| "Publish the workflow I cloned from a colleague" | `tilebox-workflow-releases` for destination discovery and linking before publication |
 | "Publish this workflow release and deploy it to dev" | `tilebox-workflow-releases` |
 | "Edit tilebox.workflow.toml deployment targets" | `tilebox-workflow-releases` |
 | "Start a dynamic runner locally for this workflow cluster" | `tilebox-workflow-releases` |
@@ -81,6 +83,14 @@ Install `core`, `datasets`, and `workflows` for implicit Earth observation proje
 | "List workflow automations" | `tilebox-workflow-automations` |
 | "Submit a CronTask or StorageEventTask once" | `tilebox-workflow-automations` |
 | "Find automation storage locations" | `tilebox-workflow-automations` |
+
+## Workflow Projects And Execution Scope
+
+Plain `workflow init` creates a local project with new-workflow intent; first publication creates and links its remote workflow. `init --template <reference>` copies the latest owned/shared release into an independent project. A cloned checkout normally lacks local state: agents inspect existing owned workflows and resolve whether to link one or create a separate destination before publishing.
+
+The TOML slug is a portable project name. The ignored `.tilebox/workflows.json` records the checkout's remote destination. Workflow references select immutable workflow UUIDs for execution; task definitions stay portable name/version pairs. Agents must always submit workflow-scoped project jobs with `--workflow .` or a remote reference, including development and local managed-runner tests. Unscoped jobs are only for explicitly requested direct Python runners or Python scripts executed as direct runners for testing. Omission remains unscoped, even inside a linked project.
+
+Skills require agents to keep the CLI current and regularly check/update workflow Python dependencies and lockfiles. The planned scoped-project release baseline is CLI >=0.14 and Tilebox Python packages >=0.68; agents check release availability and installed capabilities before relying on the new APIs.
 
 ## Implicit Earth Observation Examples
 
@@ -124,6 +134,15 @@ Use these cases when reviewing changes to skill discovery and routing. Skill sel
 | “Use Copernicus Data Space Sentinel-2 SAFE products.” | Respect the explicit source, explain metadata-versus-payload access, and guide account and S3 credential setup from direct Copernicus links. |
 | “Map flooding during this cloudy storm.” | Do not blindly select optical Sentinel-2; default to credentials-free `open_data.aws_earth.sentinel1` `GRD` when suitable and explain that GRD does not support phase-based InSAR. |
 | “Add a timelapse to this initialized Tilebox workflow.” | Detect `tilebox.workflow.toml`, skip initialization, select the source, and author the processing. |
+| “Adapt the seasonal RGB time-lapse workflow to add cloud-quality filtering.” | Search owned and shared catalogs with pagination, inspect the matching release, initialize with its exact `--template` reference, and adapt the independent copy. Do not rewrite task identifiers or publish to the source. |
+| “Publish this workflow I cloned from a colleague.” | Inspect local state and the active organization; find plausible owned workflows and ask link-versus-new when the destination is not explicit. Never infer remote identity solely from the TOML slug. |
+| “Create a new workflow locally; I will publish it later.” | Run plain init without API credentials or remote creation. Preserve new intent for first publication. |
+| “Run this task from the linked project.” | Submit with `--workflow .`; do not rely on current-directory inference or silently drop scope if resolution fails. |
+| “Smoke-test this project with a local `tilebox runner start`.” | Submit scoped jobs; a local managed runner is not a direct-runner exception. |
+| “Test this task by running a Python script as a direct runner.” | Submit unscoped roots for that direct-runner test. Return to scoped submissions for the project's managed deployment. |
+| “Update only this automation's cron schedule.” | Preserve the existing workflow scope and other omitted fields; supplying triggers replaces the complete trigger list. |
+| “The new scoped job stays queued, but the runner is healthy.” | Compare scope, task name/version, cluster deployment, and runner version; do not assume matching names in another workflow or an unscoped runner suffice. |
+| “Update this older template project before publishing.” | Review copied source, check CLI and Tilebox package releases, update allowed package constraints and lockfile, then verify imports/build. Plain `uv sync` is not an upgrade. |
 | “Move this locally working timelapse to remote runners.” | Warn that local output paths are not shared/durable and guide shared output-storage setup before remote execution. |
 | “Explain common approaches to flood mapping.” | Answer the conceptual question; do not create or deploy a workflow unless implementation is requested. |
 | “Show me the CRS and dimensions of this GeoTIFF.” | Inspect the file directly; do not create a workflow for a small metadata lookup. |

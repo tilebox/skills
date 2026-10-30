@@ -23,11 +23,13 @@ Check the user's request and nearby project files to determine the Tilebox surfa
 | Satellite, aerial, SAR, hyperspectral, multispectral, or raster imagery; AOIs; time series; mosaics; spectral indices; classification; segmentation; or change/object detection | Workflow code authoring |
 | Python task classes, task graphs, `ExecutionContext`, subtasks, caches, logs, tracing, or geospatial processing code | Workflow code authoring |
 | Raster IO, COGs, Zarr, object storage, CRS, reprojection, regridding, masks, nodata, tiling, windowing, Sentinel-2, Landsat, or geospatial ML inference | Workflow code authoring |
-| `tilebox.workflow.toml`, release artifacts, deployment targets, clusters, or dynamic runners | Workflow releases and deployment |
+| Adapt/copy a named workflow, owned/shared templates, `workflow init --template`, cloned/unlinked projects, `.tilebox/workflows.json`, `tilebox.workflow.toml`, releases, deployment targets, or dynamic runners | Workflow releases and deployment |
 | Job submission, job state, retries, cancellation, logs, spans, or cluster inspection | Workflow job operations |
 | `CronTask`, `StorageEventTask`, automation storage locations, or `--automation` submissions | Workflow automations |
 
 When multiple areas apply, route to all relevant skills. Prefer the skill for the first concrete action as the primary guide, then use the companion skills for the parts of the task they own.
+
+Always submit workflow-scoped jobs when working with workflow projects, including local managed-runner and smoke tests. Use `--workflow .` or an exact remote reference. The only exceptions are an explicitly requested direct Python runner or executing a Python script as a direct runner for testing; those require unscoped jobs. A submission-only script is not an exception. Follow `tilebox-workflow-jobs` and never drop scope to bypass a missing link or deployment.
 
 ## Implicit Earth Observation And Geospatial Projects
 
@@ -51,6 +53,8 @@ Do not automatically create a Tilebox workflow for:
 Before initializing anything, inspect the workspace:
 
 - If `tilebox.workflow.toml` exists, evolve that workflow instead of creating another one.
+- If the user asks to adapt a named existing workflow, use `tilebox-workflow-releases` to discover owned/shared candidates and initialize with `--template <exact-reference>` before writing a replacement. A template copy is an independent local project; do not link it to the source for publication. If an existing project is already present, reconcile that context rather than overwriting it.
+- If a cloned project has no local link, use releases guidance to inspect matching owned workflows and resolve whether to link or create an independent destination before publication. A portable project slug is not a remote reference.
 - If the user explicitly asks to onboard or initialize, follow that lifecycle instruction when requested; dataset selection is not a universal prerequisite for `tilebox workflow init`.
 - If no project exists and the first prompt already describes a target Earth observation product, select and preflight a suitable dataset before initialization so modality, resolution, coverage, format, and credentials are known.
 - If the workspace is empty or clearly intended for the requested project, initialize there at the appropriate point above.
@@ -62,18 +66,18 @@ Before initializing anything, inspect the workspace:
 
 For a new implicit geospatial project, carry the task through the complete route:
 
-1. Use `tilebox-cli` to verify current command schemas, installation, and authentication when needed.
+1. Use `tilebox-cli` to ensure the CLI is current and verify command schemas and authentication when needed. Regularly check/update workflow Python dependencies too; use the release's CLI >=0.14/Python >=0.68 baseline when available, without assuming an older installation supports it.
 2. Use `tilebox-datasets` whenever source data is needed. If no source was named, select one from target-product requirements, verify the live catalog and a metadata sample, and determine provider credentials or requester-pays requirements. Default to a credentials-free source when it satisfies the user's scientific and product requirements.
-3. Use `tilebox-workflow-releases` to choose a reusable, non-parametric workflow name and run `tilebox workflow init` in the intended project directory if no project exists, honoring the initialization-order policy above.
+3. Use `tilebox-workflow-releases` to choose a reusable workflow name and initialize locally if no project exists, honoring the initialization-order policy above. Use `--template` for a requested existing workflow; otherwise use the embedded scaffold. Init records new intent; first publication creates and links the remote workflow.
 4. Use `tilebox-workflow-authoring` for the task graph and processing code. Task-level parallelism is required: infer a fanout axis from the outputs and workload without requiring the user to prescribe the DAG. Small multi-output mosaics can fan out by output TIFF, with bounded mosaicing inside each worker; larger mosaics need granule/window workers followed by per-output-chunk aggregation. Follow authoring's sizing rules and use explicit dependencies for aggregation. Never collapse independent outputs into one task merely because the first run is small.
 5. Run the narrowest useful local checks and build-release validation.
 6. Use `tilebox-workflow-releases` to publish and deploy the verified release. For a quick first result, omit `--cluster` and use the organization's default cluster instead of asking the user to choose one. Explain and configure clusters only when the user is setting up infrastructure, selecting among materially different execution environments, or planning a broader rollout.
-7. When the user asks for an actual map, video, detection set, or other processed result, use `tilebox-workflow-jobs` to resolve run-specific values into technical job inputs and submit a representative job. For a small job with a runner available, wait with `tilebox job wait` and return the verified final output; otherwise inspect or report its state. Compare the completed job's task summaries and execution statistics with the planned task graph; progress units or child spans inside one task do not demonstrate fanout. If the graphs do not match, fix the workflow before reporting completion. Deployment alone does not produce the requested artifact.
+7. When the user asks for an actual map, video, detection set, or other processed result, use `tilebox-workflow-jobs` to resolve run-specific values into technical job inputs and submit a representative job with `--workflow .` or an exact remote reference. Omission remains unscoped, even inside a project. For a small job with a runner available, wait with `tilebox job wait` and return the verified final output; otherwise inspect or report its state. Compare the completed job's task summaries and execution statistics with the planned task graph; progress units or child spans inside one task do not demonstrate fanout. If the graphs do not match, fix the workflow before reporting completion. Deployment alone does not produce the requested artifact.
 8. Report the selected dataset and provider access, project location, release and deployment, job state when submitted, and output artifact or remaining blocker.
 
 For notebook or small local single-process results, a local output folder is acceptable. Before remote or distributed execution, warn that local paths are runner-local and may not be shared or durable; guide the user to configure user-controlled shared output storage and credentials. Do not assume Tilebox-hosted output storage exists yet.
 
-Treat an implementation-oriented prompt accepted by this route as authorization to initialize, publish, and deploy to a non-production target. Never infer production deployment. Respect explicit limits such as “code only” or “do not deploy.” If credentials, a suitable cluster, or a runner are unavailable, complete and verify the local implementation where possible and report the operational blocker instead of claiming deployment succeeded.
+Carry an implementation-oriented prompt through local initialization and verification; perform remote creation, publication, and deployment within the user's authorization and host agent's approval rules. Never infer production deployment. Respect explicit limits such as “code only” or “do not deploy.” If credentials, a suitable cluster, or a runner are unavailable, complete and verify the local implementation where possible and report the operational blocker instead of claiming deployment succeeded.
 
 ---
 
@@ -110,7 +114,7 @@ Treat an implementation-oriented prompt accepted by this route as authorization 
 - Geospatial workflow patterns: raster metadata, grids, CRS/projections, reprojection/regridding, COG/Zarr outputs, object-storage raster IO, nodata/masks, tiling/windowing, Sentinel-2, Landsat, and tiled ML inference
 
 **Releasing and deploying workflows** → Use `tilebox-workflow-releases`
-- `tilebox workflow init` and project scaffolding
+- Local `tilebox workflow init`, owned/shared template discovery and copying, and linking cloned projects
 - `tilebox.workflow.toml` build and deployment configuration
 - Release build, publish, deploy, and undeploy operations
 - Dynamic runners and local release-runner testing
@@ -122,7 +126,7 @@ Treat an implementation-oriented prompt accepted by this route as authorization 
 - Cluster listing and creation for job execution
 
 **Working with workflow automations** → Use `tilebox-workflow-automations`
-- Listing and inspecting workflow automations
+- Creating, updating, pausing, deleting, listing, and inspecting scoped workflow automations
 - Finding automation storage locations
 - Submitting one-off cron or storage-triggered automation tasks
 - Building `CronTask` and `StorageEventTask` job submissions
@@ -136,6 +140,8 @@ Use multiple skills when the task spans design, code, release, and operations:
 | Create a dataset and use it from workflow code | `tilebox-datasets` + `tilebox-workflow-authoring` |
 | Onboard a new STAC, XML/API, bucket, or COG-tree source | `tilebox-ingesting-datasets` + `tilebox-cli`; use `tilebox-datasets` for general dataset operations and live inspection |
 | Create or scaffold a new workflow project from scratch | `tilebox-workflow-releases` first to run `tilebox workflow init`, then `tilebox-workflow-authoring` for task code |
+| Adapt the seasonal RGB time-lapse workflow | `tilebox-workflow-releases` to discover owned/shared sources and run `init --template`, then `tilebox-workflow-authoring` to adapt the copy |
+| Publish a colleague's cloned workflow | `tilebox-workflow-releases` to inspect local link state, identify owned candidates, and resolve link-versus-new intent before publishing |
 | Build an implicit Earth observation project from an outcome-oriented prompt | `tilebox-datasets` to select/preflight a source when no project/source was specified → `tilebox-workflow-releases` to initialize if needed → `tilebox-workflow-authoring` → `tilebox-workflow-releases` to publish/deploy → `tilebox-workflow-jobs` to produce and verify the result |
 | Publish a workflow change and retry a failed job | `tilebox-workflow-releases` + `tilebox-workflow-jobs` |
 | Debug a failed workflow task from logs and fix the code | `tilebox-workflow-jobs` + `tilebox-workflow-authoring` |
