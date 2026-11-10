@@ -179,3 +179,5 @@ Retry preserves the original task inputs and scope. Deploy compatible fixes to t
 3. Use spans if timing, ordering, or runner/runtime attributes matter.
 4. Retry only after code, data, credentials, or infrastructure are fixed.
 5. Cancel if the job should stop instead of being retried.
+
+For missing/stale environment values or provider authentication failures, use `tilebox-workflow-releases` and read its `reference/environments.md` to inspect the actual execution cluster's effective variables and supplying entry scope. A managed value change applies after a successful runner refresh; active tasks retain old values. Verify with an allowlisted presence check or bounded provider request, never an environment dump. A credential-only fix needs no new release, but refresh does not automatically retry failed tasks.

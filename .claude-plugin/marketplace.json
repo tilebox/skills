@@ -29,7 +29,7 @@
     },
     {
       "name": "workflows",
-      "description": "Tilebox workflow skills for writing, releasing, running, and automating Earth observation and geospatial processing",
+      "description": "Tilebox workflow skills for writing, releasing, running, and automating Earth observation and geospatial processing, with managed environment variables and secrets",
       "source": "./",
       "strict": false,
       "skills": [

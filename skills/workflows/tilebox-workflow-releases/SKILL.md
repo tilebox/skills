@@ -1,6 +1,6 @@
 ---
 name: tilebox-workflow-releases
-description: "Initializes local Tilebox workflow projects, discovers and adapts owned/shared templates, links checkouts to remote workflows, and builds, publishes, deploys, and tests releases. Use for workflow init --template, cloned or unlinked projects, tilebox.workflow.toml, release artifacts, deployment targets, dynamic runners, or completing an implicit Earth observation project."
+description: "Initializes local Tilebox workflow projects, discovers and adapts owned/shared templates, links checkouts to remote workflows, builds/publishes/deploys/tests releases, and manages cluster environments. Use for workflow init --template, cloned or unlinked projects, tilebox.workflow.toml, release artifacts, deployment targets, dynamic runners, completing an implicit Earth observation project, or workflow variables/secrets, provider tokens/API keys, inheritance/overrides, and automatic runtime reloads."
 license: MIT
 compatibility: Requires a current tilebox CLI and uv for scaffold dependency sync, release validation, and runners. Plain local init needs no API key; remote operations, linking, and template downloads require Tilebox authentication.
 metadata:
@@ -10,6 +10,8 @@ metadata:
 # Releasing And Deploying Tilebox Workflows
 
 Use this skill to initialize workflow projects, turn workflow code changes into immutable releases, and deploy those releases to one or more Tilebox clusters. Use `tilebox-workflow-authoring` for task code and this skill for project scaffold, config, publish, deploy, and runner iteration.
+
+For environment variables, provider tokens/API keys, cluster assignments, inheritance/overrides, credential rotation, or stale runtime values, read [reference/environments.md](reference/environments.md). It covers `tilebox variable`, console secret entry, `os.environ` injection, and automatic runtime replacement. Environment-only changes do not require the release loop below.
 
 Use `tilebox-cli` first to ensure the CLI is up to date and inspect command schemas. The scoped-project release baseline is CLI >=0.14 and Tilebox Python packages >=0.68; check availability and installed capabilities rather than assuming these releases are already available. Regularly check and update project packages using authoring's `reference/tilebox/dependencies-and-packaging.md`, especially after cloning, copying a template, or resuming an older project.
 
@@ -411,7 +413,9 @@ tilebox cluster get dev-cluster --json
 
 ## Start A Dynamic Runner Locally
 
-A dynamic runner executes tasks for releases deployed to a cluster. It polls cluster deployment state, downloads/extracts missing artifacts, validates release task registrations, starts Python worker runtimes, and keeps running. It logs to stderr and does not emit JSON output.
+A dynamic runner executes tasks for releases deployed to a cluster. It polls cluster deployments and the resolved managed environment, downloads/extracts missing artifacts, validates release task registrations, starts Python worker runtimes, and keeps running. It logs to stderr and does not emit JSON output.
+
+Read [reference/environments.md](reference/environments.md) when workflows need tokens/API keys or other runtime configuration. Configure variables on the execution cluster, not in release artifacts or TOML. Environment-capable runners inject them automatically and replace runtimes when effective values change, letting active tasks finish with old values. A value-only change needs no republish, redeploy, or manual runner restart. Local build/publish validation and dependency installation do not fetch these cluster variables; use lazy client initialization for task-only credentials.
 
 `tilebox runner start` requires `uv` on `PATH` to start Python worker runtimes from workflow release artifacts. If `uv` is missing, install or fix `uv` before starting the runner.
 
@@ -450,7 +454,7 @@ tilebox job submit \
 Runner notes for debugging:
 
 - With no deployed workflows, the runner idles locally and logs a warning.
-- Deployment changes are picked up by polling, roughly every 10 seconds plus jitter.
+- Deployment and effective environment changes are picked up by polling, roughly every 10 seconds plus jitter; read [reference/environments.md](reference/environments.md) for refresh failures, inheritance, and rotation verification.
 - Invalid deployed releases are skipped while valid releases remain runnable.
 - Upgrade managed runner CLIs as well as the submitting CLI before using scoped deployments. Releases contain unbound name/version pairs; the managed runner binds them to the deployment's workflow UUID without rewriting source or artifacts.
 - Different workflows may expose the same task name/major on one cluster. Two workflows exposing the same unscoped legacy alias still conflict; duplicate name/major pairs within one release are invalid even with different minors.

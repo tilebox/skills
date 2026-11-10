@@ -48,7 +48,7 @@ Install `core`, `datasets`, and `workflows` for implicit Earth observation proje
 | Skill | Purpose | When to Use |
 | --- | --- | --- |
 | `tilebox-workflow-authoring` | Write Python Tilebox workflow code for task graphs, datasets, storage, observability, and Earth observation or geospatial processing | Any task creating or modifying Tilebox workflow source code, including implicit imagery, monitoring, classification, change-detection, or object-detection requests |
-| `tilebox-workflow-releases` | Initialize local projects, discover owned/shared templates, link remote workflows, and build/publish/deploy releases | Adapting an existing workflow, `workflow init --template`, cloned/unlinked projects, config, release publishing, deployment targets, clusters, and dynamic runners |
+| `tilebox-workflow-releases` | Initialize local projects, discover owned/shared templates, link remote workflows, build/publish/deploy releases, and manage workflow environments | Adapting an existing workflow, `workflow init --template`, cloned/unlinked projects, config, deployment targets, dynamic runners, variables/secrets, cluster inheritance/overrides, and runtime reloads |
 | `tilebox-workflow-jobs` | Manage workflow jobs with `tilebox job`: submit, list, inspect, wait, logs, spans, retry, and cancel | Any task involving workflow job operations, debugging, or root task submission |
 | `tilebox-workflow-automations` | Create, update, pause, delete, and inspect scoped automations; submit one-off cron/storage triggers | Persistent automations, task scope, storage locations, or `CronTask` / `StorageEventTask` submissions |
 
@@ -77,6 +77,9 @@ Install `core`, `datasets`, and `workflows` for implicit Earth observation proje
 | "Publish this workflow release and deploy it to dev" | `tilebox-workflow-releases` |
 | "Edit tilebox.workflow.toml deployment targets" | `tilebox-workflow-releases` |
 | "Start a dynamic runner locally for this workflow cluster" | `tilebox-workflow-releases` |
+| "Give this workflow a provider API key on the dev cluster" | `tilebox-workflow-releases` → `reference/environments.md` |
+| "Override the global setting on one cluster" | `tilebox-workflow-releases` → `reference/environments.md` |
+| "Rotate this secret without interrupting running tasks" | `tilebox-workflow-releases` → `reference/environments.md` |
 | "Write a Python Tilebox workflow" | `tilebox-workflow-authoring` |
 | "Add progress labels and structured logs to workflow tasks" | `tilebox-workflow-authoring` |
 | "Design a Tilebox task graph with subtasks and dependencies" | `tilebox-workflow-authoring` |
@@ -91,6 +94,12 @@ Plain `workflow init` creates a local project with new-workflow intent; first pu
 The TOML slug is a portable project name. The ignored `.tilebox/workflows.json` records the checkout's remote destination. Workflow references select immutable workflow UUIDs for execution; task definitions stay portable name/version pairs. Agents must always submit workflow-scoped project jobs with `--workflow .` or a remote reference, including development and local managed-runner tests. Unscoped jobs are only for explicitly requested direct Python runners or Python scripts executed as direct runners for testing. Omission remains unscoped, even inside a linked project.
 
 Skills require agents to keep the CLI current and regularly check/update workflow Python dependencies and lockfiles. The planned scoped-project release baseline is CLI >=0.14 and Tilebox Python packages >=0.68; agents check release availability and installed capabilities before relying on the new APIs.
+
+## Workflow Environments
+
+The [environment reference](skills/workflows/tilebox-workflow-releases/reference/environments.md) in `tilebox-workflow-releases` teaches agents to store variables and secrets with `tilebox variable` or Workflows → Environment in the console. All-clusters entries supply defaults; selected-cluster entries override them. Entries assigned to several clusters share one value, so updates affect the whole entry's scope. Agents inspect effective configuration before changing it and keep credentials out of code, task inputs, release artifacts, and logs.
+
+Environment-capable managed runners inject resolved values into `os.environ` and replace worker runtimes after a successful poll detects changed values. Running tasks finish with their old environment; new work uses the replacement. Value-only changes need no new release or manual runner restart. The integration targets CLI 0.15; agents check support on runner machines as well as their own machine. Standalone Python runners and local build validation need separately configured environments.
 
 ## Implicit Earth Observation Examples
 
@@ -142,6 +151,12 @@ Use these cases when reviewing changes to skill discovery and routing. Skill sel
 | “Test this task by running a Python script as a direct runner.” | Submit unscoped roots for that direct-runner test. Return to scoped submissions for the project's managed deployment. |
 | “Update only this automation's cron schedule.” | Preserve the existing workflow scope and other omitted fields; supplying triggers replaces the complete trigger list. |
 | “The new scoped job stays queued, but the runner is healthy.” | Compare scope, task name/version, cluster deployment, and runner version; do not assume matching names in another workflow or an unscoped runner suffice. |
+| “Override the inherited provider key only on dev.” | Read the releases skill's environment reference, inspect the effective entry, and create a dev-specific secret rather than edit the all-clusters default. Request secret entry through the console or a protected input channel. |
+| “Update this key selected by dev; it is shared with batch.” | Explain that selecting dev still updates both clusters; resolve the intended scope before writing. |
+| “I deleted the override, but the variable is still present.” | Check all-clusters fallback, then inherited runner-host values and whether the task predates refresh. Do not assume deletion guarantees an unset process variable. |
+| “Rotate the provider token while a long job is running.” | Keep the runner up; explain old-task/new-task overlap and coordinate provider revocation after old tasks drain. Verify without logging credentials. |
+| “My standalone Python runner does not see a managed secret.” | Explain that automatic injection belongs to managed `tilebox runner start`; configure the direct process environment without claiming it polls Tilebox variables. |
+| “Configure my agent host's API key, not a Tilebox workflow.” | Do not route to Tilebox workflow environments or create a Tilebox variable. |
 | “Update this older template project before publishing.” | Review copied source, check CLI and Tilebox package releases, update allowed package constraints and lockfile, then verify imports/build. Plain `uv sync` is not an upgrade. |
 | “Move this locally working timelapse to remote runners.” | Warn that local output paths are not shared/durable and guide shared output-storage setup before remote execution. |
 | “Explain common approaches to flood mapping.” | Answer the conceptual question; do not create or deploy a workflow unless implementation is requested. |
@@ -177,7 +192,9 @@ tilebox-skills/
         ├── tilebox-workflow-jobs/
         │   └── SKILL.md
         └── tilebox-workflow-releases/
-            └── SKILL.md
+            ├── SKILL.md
+            └── reference/
+                └── environments.md
 ```
 
 ## Resources

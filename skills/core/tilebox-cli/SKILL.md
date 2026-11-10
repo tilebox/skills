@@ -1,6 +1,6 @@
 ---
 name: tilebox-cli
-description: "Use the Tilebox CLI for datasets, workflows, docs search, automations, parallel task runners. Use when a task involves tilebox commands. How to handle authentication, JSON output, agent-context schemas, pagination, installation, or upgrades."
+description: "Use the Tilebox CLI for datasets, workflows, environment variables and secrets, docs search, automations, parallel task runners. Use when a task involves tilebox commands. How to handle authentication, JSON output, agent-context schemas, pagination, installation, or upgrades."
 license: MIT
 metadata:
   author: tilebox
@@ -44,6 +44,8 @@ tilebox --api-url https://api.tilebox.dev account get --json
 ```
 
 If auth is missing, commands return a validation-style usage error. After installation, or when investigating authentication failures, use `tilebox account get --json` to verify the API endpoint and active credential. Do not print or log API keys.
+
+Workflow/provider credentials belong in Tilebox's managed environment; use `tilebox-workflow-releases` and read its `reference/environments.md` for `tilebox variable`, cluster inheritance, and automatic runtime reloads. This does not replace the CLI/runner's own bootstrap `TILEBOX_API_KEY` authentication.
 
 ## JSON Output
 
@@ -226,6 +228,7 @@ The current CLI exposes these top-level command families. Run `tilebox agent-con
 | `dataset` | Create, update, inspect, query, find datapoints, and generate types for datasets. | `tilebox dataset list`, `tilebox dataset get <dataset-slug>`, `tilebox dataset create`, `tilebox dataset update <dataset-slug>`, `tilebox dataset query <dataset-slug>`, `tilebox dataset find <dataset-slug> <datapoint-id>`, `tilebox dataset generate --slug <dataset-slug>` |
 | `dataset collection` | Manage collections within a dataset. | `tilebox dataset collection list --dataset <dataset-slug>`, `tilebox dataset collection get <name> --dataset <dataset-slug>`, `tilebox dataset collection create <name> --dataset <dataset-slug>`, `tilebox dataset collection delete <name> --dataset <dataset-slug>` |
 | `job` | Submit, monitor, debug, retry, wait for, and cancel workflow jobs. | `tilebox job submit`, `tilebox job list`, `tilebox job get <job-id>`, `tilebox job wait <job-id>`, `tilebox job retry <job-id>`, `tilebox job cancel <job-id>`, `tilebox job logs <job-id>`, `tilebox job spans <job-id>` |
+| `variable` | Manage workflow variables/secrets and cluster assignments; requires an environment-capable CLI/backend. | `tilebox variable list`, `tilebox variable list --cluster <slug>`, `tilebox variable create`, `tilebox variable get <name-or-id>`, `tilebox variable update <name-or-id>`, `tilebox variable scope <id>`, `tilebox variable delete <name-or-id>` |
 | `workflow` | Initialize local projects, copy templates, link remote destinations, and release workflows. | `tilebox workflow init`, `tilebox workflow init --template <reference>`, `tilebox workflow link <reference>`, `tilebox workflow create`, `tilebox workflow list`, `tilebox workflow get`, `tilebox workflow build-release`, `tilebox workflow publish-release`, `tilebox workflow deploy-release`, `tilebox workflow undeploy-release` |
 | `docs` | Search Tilebox documentation from the CLI. | `tilebox docs search "<query>"` |
 | `parallel` | Run a shell command multiple times in parallel. | `tilebox parallel -n <count> -- <command> [args...]` |

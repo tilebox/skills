@@ -83,6 +83,8 @@ Keep three access layers explicit:
 
 For every selected source, tell the user what Tilebox provides, where the bytes live, their format, whether source credentials or requester-pays charges apply, and what access was actually validated. Never ask the user to paste secrets into chat or place them in task inputs, `job_cache`, logs, source control, or release artifacts.
 
+For managed workflow runners, use `tilebox-workflow-releases` and read its `reference/environments.md` to store provider/output-storage credentials as secrets assigned to the execution cluster. That reference covers inheritance, overrides, and runtime refresh; provider references here still define which credential names and client parameters are needed. Local shell credentials do not automatically reach remote runners. Keep existing workload identity where appropriate, and do not introduce credentials for public unsigned sources.
+
 ## Inspect Existing Datasets
 
 Listing and inspecting existing datasets:

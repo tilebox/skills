@@ -24,6 +24,7 @@ Check the user's request and nearby project files to determine the Tilebox surfa
 | Python task classes, task graphs, `ExecutionContext`, subtasks, caches, logs, tracing, or geospatial processing code | Workflow code authoring |
 | Raster IO, COGs, Zarr, object storage, CRS, reprojection, regridding, masks, nodata, tiling, windowing, Sentinel-2, Landsat, or geospatial ML inference | Workflow code authoring |
 | Adapt/copy a named workflow, owned/shared templates, `workflow init --template`, cloned/unlinked projects, `.tilebox/workflows.json`, `tilebox.workflow.toml`, releases, deployment targets, or dynamic runners | Workflow releases and deployment |
+| Workflow environment variables, secrets, provider tokens/API keys on runners, cluster assignments, inheritance/overrides, credential rotation, or automatic runtime reload | Workflow releases and deployment → `reference/environments.md` |
 | Job submission, job state, retries, cancellation, logs, spans, or cluster inspection | Workflow job operations |
 | `CronTask`, `StorageEventTask`, automation storage locations, or `--automation` submissions | Workflow automations |
 
@@ -77,6 +78,8 @@ For a new implicit geospatial project, carry the task through the complete route
 
 For notebook or small local single-process results, a local output folder is acceptable. Before remote or distributed execution, warn that local paths are runner-local and may not be shared or durable; guide the user to configure user-controlled shared output storage and credentials. Do not assume Tilebox-hosted output storage exists yet.
 
+When a workflow needs provider or output-storage credentials, use `tilebox-workflow-releases` and its `reference/environments.md` to configure managed secrets on the execution cluster before running it. Local shell credentials do not automatically reach remote runners. Keep credentials out of task inputs and release artifacts; workflow code reads the injected environment.
+
 Carry an implementation-oriented prompt through local initialization and verification; perform remote creation, publication, and deployment within the user's authorization and host agent's approval rules. Never infer production deployment. Respect explicit limits such as “code only” or “do not deploy.” If credentials, a suitable cluster, or a runner are unavailable, complete and verify the local implementation where possible and report the operational blocker instead of claiming deployment succeeded.
 
 ---
@@ -118,6 +121,7 @@ Carry an implementation-oriented prompt through local initialization and verific
 - `tilebox.workflow.toml` build and deployment configuration
 - Release build, publish, deploy, and undeploy operations
 - Dynamic runners and local release-runner testing
+- Managed variables/secrets, cluster inheritance/overrides, and automatic runtime reloads: read the skill's `reference/environments.md`
 
 **Managing workflow jobs** → Use `tilebox-workflow-jobs`
 - Job submission, listing, inspection, and waiting
@@ -159,7 +163,7 @@ If you know your task, you can directly access:
 - `/tilebox-datasets` - Dataset schemas, collections, datapoints, docs, and generated types
 - `/tilebox-ingesting-datasets` - New source suitability, STAC/non-STAC normalization, schema discovery, converters, and ingestion validation
 - `/tilebox-workflow-authoring` - Python workflow task code, task graphs, subtasks, caches, logs, tracing, and geospatial raster/grid/projection patterns
-- `/tilebox-workflow-releases` - Workflow init, release build/publish, deployment, targets, and runners
+- `/tilebox-workflow-releases` - Workflow init, release build/publish, deployment, targets, runners, and managed environments
 - `/tilebox-workflow-jobs` - Job submission, monitoring, logs, spans, retries, cancellation, and clusters
 - `/tilebox-workflow-automations` - Workflow automations, cron/storage triggers, and one-off automation submissions
 

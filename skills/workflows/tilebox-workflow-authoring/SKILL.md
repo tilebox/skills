@@ -25,7 +25,7 @@ tilebox docs search "caches job_cache"
 
 Delegate adjacent ownership:
 
-- `tilebox-workflow-releases`: local initialization, owned/shared template discovery, checkout linking, `pyproject.toml` scaffold, build, publish, deploy, and runner configuration.
+- `tilebox-workflow-releases`: local initialization, owned/shared template discovery, checkout linking, `pyproject.toml` scaffold, build, publish, deploy, runner configuration, and managed environments in `reference/environments.md`.
 - `tilebox-workflow-jobs`: submit, wait, list, inspect, retry, cancel, and cluster operations.
 - `tilebox-datasets`: source/product recommendations, exact dataset slugs, provider credentials, auxiliary catalogues, and CLI inspection.
 - `tilebox-cli`: authentication, CLI discovery, JSON output, and docs search.
@@ -175,6 +175,8 @@ Use `context.logger` with structured fields and `logger.bind` for repeated conte
 - Asset byte access and bounded COG windows: `reference/tilebox/storage-access.md`.
 
 Do not reconstruct provider paths, repeat storage API snippets, or embed source/provider setup. Apply scale/offset, nodata, masks, alignment, and reprojection explicitly. Keep downloads in the consuming task and pass durable IDs/keys—not local paths—to another task.
+
+For provider tokens, API keys, and shared runtime configuration, follow `reference/environments.md` in `tilebox-workflow-releases` and read documented names through `os.environ`. Managed runners inject them before imports and replace runtimes on changes; do not implement a secret fetcher or polling loop. Prefer constructing credential-dependent clients during task execution or lazy initialization so local build/task discovery needs no deployment-only secrets. Never log the environment or serialize credentials into task fields.
 
 ## Dependencies And Operations
 
